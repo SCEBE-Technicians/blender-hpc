@@ -23,7 +23,7 @@ if [ ${#work_dir} -ge 1  ]; then
   cd job
 
   if [ ${frame_start} == ${FRAME}  ]; then  
-    sacct --format=JobID%20,Jobname%50,state,Submit,start,end -j ${SLURM_JOBID} | grep -v "\." > ${work_dir}.job
+    squeue -j ${SLURM_JOBID} -h -o "%i %j %T %V %S %e" > ${work_dir}.job || true
   fi  
 fi
 ###############################################
@@ -47,17 +47,9 @@ mkdir -p ${OUT_DIR}
 mkdir -p ${CACHE_DIR}
 
 ###############################################
-#ml Blender/${blender_version}
-#ml apptainer
-ml CUDA
-ml Mesa
-###############################################
-if [ ${use_xorg} == "True"  ]; then
-  Xorg :0 >> ${LOG_XORG} 2>> ${ERR_XORG} &
-  sleep 10 # wait on xorg
-  export DISPLAY=:0
-fi
-###############################################
+# No site-specific environment modules are assumed on scebe-gpu-server.
 
-#apptainer exec -B /scratch -B /mnt -B /apps -B ${CUDA_ROOT}:/usr/local/cuda --nv /apps/all/OS/Ubuntu/ubuntu_blender/ubuntu_blender.img /apps/all/Blender/${blender_version}/
-~/blender/blender --factory-startup --enable-autoexec -noaudio --background ${IN_DIR}/${BLEND_FILE} -E CYCLES -P ~/braas-hpc/scripts/karolina-slurm/use_gpu.py --render-output ${OUT_DIR}/###### ${FRAME_CMD} >> ${LOG} 2>> ${ERR}
+###############################################
+~/blender/blender --factory-startup --enable-autoexec -noaudio --background ${IN_DIR}/${BLEND_FILE} -E CYCLES --render-output ${OUT_DIR}/###### ${FRAME_CMD} >> ${LOG} 2>> ${ERR}
+
+

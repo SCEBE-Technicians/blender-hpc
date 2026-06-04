@@ -16,7 +16,6 @@
 #
 # ##### END GPL LICENSE BLOCK #####
 
-# (c) Blender Foundation
 
 """Manages the asyncio loop."""
 
@@ -56,13 +55,10 @@ def setup_asyncio_executor():
     loop.set_default_executor(executor)
     # loop.set_debug(True)
 
-    # from . import pillar
 
     # Python 3.8 deprecated the 'loop' parameter, 3.10 removed it.
-    #kwargs = {"loop": loop} if sys.version_info < (3, 8) else {}
 
     # No more than this many Pillar calls should be made simultaneously
-    # pillar.pillar_semaphore = asyncio.Semaphore(3, **kwargs)
 
 def kick_async_loop(*args) -> bool:
     """Performs a single iteration of the asyncio event loop.
@@ -81,7 +77,6 @@ def kick_async_loop(*args) -> bool:
         return True
 
     # Passing an explicit loop is required. Without it, the function uses
-    # asyncio.get_running_loop(), which raises a RuntimeError as the current
     # loop isn't running.
     if bpy.app.version < (2, 90, 0):
         all_tasks = asyncio.Task.all_tasks()
@@ -117,7 +112,6 @@ def kick_async_loop(*args) -> bool:
                 print("{}: resulted in exception".format(task))
                 traceback.print_exc()
 
-            # for ref in gc.get_referrers(task):
             #     log.debug('      - referred by %s', ref)
 
     loop.stop()
@@ -152,7 +146,6 @@ class AsyncLoopModalOperator(bpy.types.Operator):
         global _loop_kicking_operator_running
 
         # This can be required when the operator is running while Blender
-        # (re)loads a file. The operator then doesn't get the chance to
         # finish the async tasks, hence stop_after_this_kick is never True.
         _loop_kicking_operator_running = False
 
@@ -188,7 +181,6 @@ class AsyncLoopModalOperator(bpy.types.Operator):
         if event.type != "TIMER":
             return {"PASS_THROUGH"}
 
-        # self.log.debug('KICKING LOOP')
         stop_after_this_kick = kick_async_loop()
         if stop_after_this_kick:
             context.window_manager.event_timer_remove(self.timer)
@@ -254,7 +246,11 @@ class AsyncModalOperatorMixin:
             ex = task.exception()
             if ex is not None:
                 self._state = "EXCEPTION"
-                self.log.error("Exception while running task: %s", ex)
+                self.log.error(
+                    "Exception while running task: %s",
+                    ex,
+                    exc_info=(type(ex), ex, ex.__traceback__),
+                )
                 
                 context.window_manager.raas_status = "ERROR"
                 context.window_manager.raas_status_txt = "Exception while running task: %s" % ex

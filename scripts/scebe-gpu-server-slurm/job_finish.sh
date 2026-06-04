@@ -29,7 +29,11 @@ mkdir -p ${CACHE_DIR}
 
 ###############################################
 if [ ${#work_dir} -ge 1  ]; then
-  sacct --format=JobID%20,Jobname%50,state,Submit,start,end -j ${depends_on##* } > ${work_dir}.job
+  JOB_ID=${depends_on##* }
+  squeue -j ${JOB_ID} -h -o "%i %j %T %V %S %e" > ${work_dir}.job || true
+  if [ ! -s ${work_dir}.job ]; then
+    echo "${JOB_ID} ${job_project} COMPLETED unknown unknown unknown" > ${work_dir}.job
+  fi
 fi
 ###############################################
 

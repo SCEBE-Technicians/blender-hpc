@@ -16,7 +16,6 @@
 #
 # ##### END GPL LICENSE BLOCK #####
 
-# (c) IT4Innovations, VSB-TUO
 
 import functools
 import logging
@@ -40,6 +39,7 @@ import pathlib
 import json
 
 import time
+import re
 
 ################################
 
@@ -69,13 +69,11 @@ async def CreateJobTask3Dep(context,
     blender_job_info_new = context.scene.raas_blender_job_info_new
     job_type = blender_job_info_new.job_type
 
-    pref = raas_pref.preferences()
-    preset = pref.cluster_presets[context.scene.raas_cluster_presets_index]    
+    preset = raas_pref.get_selected_cluster_preset(context)
 
     job = None
     username = preset.raas_da_username
     use_xorg = str(job_type == 'ORIGEEVEE' or job_type == 'ORIGWORKBENCH')
-    # use_mpi1 = raas_config.GetDAQueueMPIProcs(job_task1.CommandTemplateId)
     use_mpi1 = context.scene.raas_config_functions.call_get_da_queue_mpi_procs(job_task1.CommandTemplateId)
     use_mpi2 = context.scene.raas_config_functions.call_get_da_queue_mpi_procs(job_task2.CommandTemplateId)
     use_mpi3 = context.scene.raas_config_functions.call_get_da_queue_mpi_procs(job_task3.CommandTemplateId)
@@ -84,20 +82,14 @@ async def CreateJobTask3Dep(context,
         job_arrays = None
         frame_start = blender_job_info_new.frame_current
         frame_end = blender_job_info_new.frame_current
-        #frame_step = str(blender_job_info_new.frame_step)
         max_jobs = 1
         custom_job_arrays = ''
     else:
         frame_start = blender_job_info_new.frame_start
         frame_end = blender_job_info_new.frame_end
-        #frame_step = str(blender_job_info_new.frame_step)       
         max_jobs = blender_job_info_new.max_jobs
         custom_job_arrays = blender_job_info_new.job_arrays
-        # if use_mpi2 == 0:
-        #     # job_arrays = '%d-%d:%d' % (blender_job_info_new.frame_start,
         #     #                            blender_job_info_new.frame_end, blender_job_info_new.frame_step)
-        # else:
-        #     # job_arrays = '%d-%d:%d' % (blender_job_info_new.frame_start,
         #     #                            blender_job_info_new.frame_end, blender_job_info_new.frame_step * use_mpi2)
 
         if len(custom_job_arrays) == 0:
@@ -370,87 +362,6 @@ async def CreateJobTask3Dep(context,
     item.AllParameters = raas_server.json_dumps(data)
     # Tasks: bpy.props.StringProperty(name="Tasks")
 
-def CmdCreatePBSJob(context):
-    """
-        Creates a command that correctly submits PBS jobs.
-    """
-    item = context.scene.raas_submitted_job_info_ext_new
-    data = json.loads(item.AllParameters)
-
-    job = data['JobSpecification']
-    job_name = job['Name']
-    job_project = job['Project']
-    tasks = job['Tasks']
-    cluster_id = job['ClusterId']
-
-    cmd = ''
-    task_id = 0
-    for task in tasks:
-        cluster_node_type_id = task['ClusterNodeTypeId']
-        command_template_id = task['CommandTemplateId']
-        # cores, script = raas_config.GetDAQueueScript(cluster_id, command_template_id)
-        cores, script = context.scene.raas_config_functions.call_get_da_queue_script(cluster_id, command_template_id)
-
-        # pid_name, pid_queue, pid_dir = raas_config.GetCurrentPidInfo(context, raas_pref.preferences())
-        pid_name, pid_queue, pid_dir = context.scene.raas_config_functions.call_get_current_pid_info(context, raas_pref.preferences())
-
-        file = task['TemplateParameterValues'][0]['ParameterValue']
-
-        # ncpus = int(cores)
-        nodes = 1  # int(task['MaxCores'] / cores)
-
-        envs = task['EnvironmentVariables']
-        job_env = ''
-
-        if len(envs) > 0:
-            for env in envs:
-                job_env = job_env + env['Name'] + '=' + env['Value'] + ','
-
-        work_dir = raas_connection.get_direct_access_remote_storage(
-            context) + '/' + job_name
-
-        work_dir_stderr = work_dir + '/' + task['StandardErrorFile']
-        work_dir_stdout = work_dir + '/' + task['StandardOutputFile']
-
-        mm, ss = divmod(task['WalltimeLimit'], 60)
-        hh, mm = divmod(mm, 60)
-
-        walltime = str(hh) + ':' + str(mm) + ':' + str(ss)
-
-        job_array = ''
-        if 'JobArrays' in task:
-            if not task['JobArrays'] is None:
-                job_array = ' -J ' + task['JobArrays']
-
-        depends_on = ''
-        if 'DependsOn' in task:
-            depends_on = ' -W depend=afterany:$_' + str(task_id - 1)
-            job_env = job_env + 'depends_on=\"$_' + str(task_id - 1) + '\",'
-
-        job_env = job_env + 'work_dir=' + work_dir
-
-        xorg_true = ''        
-        # if command_template_id in [16, 26, 17, 27]:  # eevee on barbora or karolina
-        #     xorg_true = ' -l xorg=True '
-
-        custom_flags = context.scene.raas_config_functions.call_get_special_job_flags(context, cluster_id, command_template_id)
-
-        #pid = raas_config.GetDAOpenCallProject(pid_name)
-        pid = context.scene.raas_config_functions.call_get_da_open_call_project(pid_name)
-
-        ## -P \"' + job_project +
-        cmd = cmd + '_' + str(task_id) + '=$(echo \' ' + script + ' ' + file + ' \' | qsub ' + \
-            ' -A ' + pid + ' -v ' + \
-            job_env + ' -l select=' + str(nodes) + \
-            ' -N \"' + job_project + '\" -l walltime=' + walltime + ' -e ' + work_dir_stderr + \
-            ' -o ' + work_dir_stdout + ' -q ' + pid_queue + job_array + \
-                    depends_on + custom_flags + xorg_true + ');echo $_' + str(task_id) + ';'
-
-        task_id = task_id + 1
-
-    print(cmd)
-    return cmd
-
 
 def CmdCreateSLURMJob(context):
     """Creates a command to submit a Slurm job on cluster.
@@ -475,15 +386,12 @@ def CmdCreateSLURMJob(context):
     for task in tasks:
         cluster_node_type_id = task['ClusterNodeTypeId']
         command_template_id = task['CommandTemplateId']
-        #cores, script = raas_config.GetDAQueueScript(cluster_id, command_template_id)
         cores, script = context.scene.raas_config_functions.call_get_da_queue_script(cluster_id, command_template_id)
 
-        # pid_name, pid_queue, pid_dir = raas_config.GetCurrentPidInfo(context, raas_pref.preferences())
         pid_name, pid_queue, pid_dir = context.scene.raas_config_functions.call_get_current_pid_info(context, raas_pref.preferences())
 
         file = task['TemplateParameterValues'][0]['ParameterValue']
 
-        # ncpus = int(cores)
         nodes = 1  # int(task['MaxCores'] / cores)
 
         envs = task['EnvironmentVariables']
@@ -517,13 +425,13 @@ def CmdCreateSLURMJob(context):
         job_env = job_env + 'work_dir=' + work_dir
 
         xorg_true = ''
-        # if command_template_id in [16, 26, 17, 27]:  # eevee on barbora or karolina
-        #     xorg_true = ' --comment="use:xorg=True" '
 
         custom_flags = context.scene.raas_config_functions.call_get_special_job_flags(context, cluster_id, command_template_id, pid_queue)
+        account_arg = ''
+        if context.scene.raas_blender_job_info_new.cluster_type != 'SCEBE':
+            account_arg = ' --account ' + raas_config.GetDAOpenCallProject(pid_name)
 
-        cmd = cmd + '_' + str(task_id) + '=$(echo \' ' + script + ' ' + file + ' \' | sbatch --account ' + \
-            raas_config.GetDAOpenCallProject(pid_name) + ' --export=' + job_env + ' --nodes=' + \
+        cmd = cmd + '_' + str(task_id) + '=$(echo \' ' + script + ' ' + file + ' \' | sbatch' + account_arg + ' --export=' + job_env + ' --nodes=' + \
             str(nodes) + ' --job-name \"' + job_project + '\" --time=' + walltime + ' --partition=' + pid_queue + \
             custom_flags + ' ' + job_array + ' --error=' + work_dir_stderr + ' --output=' + work_dir_stdout + \
             depends_on + xorg_true + ' ' + script + ' ' + file + '); echo ${_' + str(task_id) + '##* };'
@@ -533,39 +441,8 @@ def CmdCreateSLURMJob(context):
     return cmd
 
 def CmdCreateJob(context):
-    #scheduler = raas_config.GetSchedulerFromContext(context)
-    scheduler = context.scene.raas_config_functions.call_get_scheduler_from_context(context)
+    return CmdCreateSLURMJob(context)
 
-
-    if scheduler == 'SLURM':
-        return CmdCreateSLURMJob(context)
-    elif scheduler == 'PBS':
-        return CmdCreatePBSJob(context)
-    else:
-        raise ValueError("Unknown scheduler type: {}".format(scheduler))
-
-
-def CmdCreateStatPBSJobFile(context, pbs_jobs):
-    """
-        Creates a command to checks PBS jobs.
-    """
-    item = context.scene.raas_submitted_job_info_ext_new
-    data = json.loads(item.AllParameters)
-
-    job = data['JobSpecification']
-    job_name = job['Name']
-
-    cmd = ''
-
-    pbs_jobs = pbs_jobs.split('\n')
-    pbs_job = pbs_jobs[1]
-
-    if len(pbs_job) > 0:
-        job_log = raas_connection.get_direct_access_remote_storage(
-            context) + '/' + job_name + '.job'
-        cmd = cmd + 'qstat -fx ' + pbs_job + ' > ' + job_log + ';'        
-
-    return cmd
 
 
 def CmdCreateStatSLURMJobFile(context, slurm_jobs):
@@ -586,31 +463,43 @@ def CmdCreateStatSLURMJobFile(context, slurm_jobs):
 
     cmd = ''
 
-    slurm_jobs = slurm_jobs.split('\n')  # e,g., '2752\n2753\n2754\n'
-    slurm_job = slurm_jobs[1]  # avoid the init and finish scripts
+    slurm_jobs = slurm_extract_job_ids(slurm_jobs)
+    if not slurm_jobs:
+        raise Exception("No Slurm job ids found in sbatch output.")
+
+    # Prefer the render job. A full submit has init, render, finish; partial
+    # submits still get a status file for the first submitted job.
+    slurm_job = slurm_jobs[1] if len(slurm_jobs) > 1 else slurm_jobs[0]
 
     if len(slurm_jobs) > 0:
         job_log = raas_connection.get_direct_access_remote_storage(
             context) + '/' + job_name + '.job'
-        # grep -v omits logging of such as slurmID.batch tasks
-        cmd = cmd + 'sacct -j ' + slurm_job + ' --format=JobID%20,Jobname%50,state,Submit,start,end | grep -v "\." > ' \
-            + job_log + ';'
+        if context.scene.raas_blender_job_info_new.cluster_type == 'SCEBE':
+            # SCEBE Slurm accounting is disabled, so sacct fails. squeue only
+            # sees active jobs; the finish script writes the final COMPLETED state.
+            cmd = cmd + 'squeue -j ' + slurm_job + ' -h -o "%i %j %T %V %S %e" > ' + job_log + ' || true;'
+        else:
+            # grep -v omits logging of such as slurmID.batch tasks
+            cmd = cmd + 'sacct -j ' + slurm_job + ' --format=JobID%20,Jobname%50,state,Submit,start,end | grep -v "\\." > ' \
+                + job_log + ';'
 
     return cmd
 
 def CmdCreateStatJobFile(context, slurm_jobs):
-    #scheduler = raas_config.GetSchedulerFromContext(context)
-    scheduler = context.scene.raas_config_functions.call_get_scheduler_from_context(context)
-
-    if scheduler == 'SLURM':
-        return CmdCreateStatSLURMJobFile(context, slurm_jobs)
-    elif scheduler == 'PBS':
-        return CmdCreateStatPBSJobFile(context, slurm_jobs)
-    else:
-        raise ValueError("Unknown scheduler type: {}".format(scheduler))
+    return CmdCreateStatSLURMJobFile(context, slurm_jobs)
 
 
 ########################################################################################
+def slurm_extract_job_ids(output):
+    """Extract numeric Slurm job IDs from sbatch output."""
+    job_ids = []
+    for line in output.splitlines():
+        match = re.search(r'\b(\d+)(?:_\d+)?\b', line)
+        if match:
+            job_ids.append(match.group(1))
+    return job_ids
+
+
 def slurm_map_slurm_status(slurm_status):
     """
     Maps Slurm statuses to the inner ones.
@@ -621,15 +510,6 @@ def slurm_map_slurm_status(slurm_status):
         _int_: _Inner status code._
     """
 
-    # JobStateExt_items = [
-    #     ("CONFIGURING", "Configuring", "", 1),
-    #     ("SUBMITTED", "Submitted", "", 2),
-    #     ("QUEUED", "Queued", "", 4),
-    #     ("RUNNING", "Running", "", 8),
-    #     ("FINISHED", "Finished", "", 16),
-    #     ("FAILED", "Failed", "", 32),
-    #     ("CANCELED", "Canceled", "", 64),
-    # ]
     # See https://docs.it4i.cz/general/slurm-job-submission-and-execution/#quick-overview-of-common-batch-job-options
     status = 1  #  "CONFIGURING"
     if slurm_status == 'RUNNING' \
@@ -673,7 +553,6 @@ def slurm_helper_raas_dict_jobs(id, name, project, cluster_name, job_type, state
     item['Name'] = name
     item['Project'] = project
     item['ClusterName'] = cluster_name
-    # item['JobType'] = job_type
     if state is not None:
         item['State'] = state
     return item
@@ -687,18 +566,24 @@ def slurm_helper_read_slurm_job_array(lines):
     Returns:
         _tuple_: _Tuple of the calculated status and a number of read lines_.
     """
+    if not lines:
+        return 1, 1
+
     index = 0
     line = lines[index]  # Get the first line and parse it
-    elements = line.split()
+    elements = slurm_split_job_line(line)
+    if len(elements) < 4:
+        return 1, 1
+
     slurm_id = elements[1].split('.')  # list
     job_statuses = []
     out_of_range = False
 
     while(not out_of_range \
+            and len(elements) >= 7 \
             and "JobID" not in elements[1] \
                 and "----" not in elements[1] \
-                    and len(slurm_id[0].split('_')) == 2 \
-                        and len(elements) == 7): 
+                    and len(slurm_id[0].split('_')) == 2): 
         if len(slurm_id) != 2:  # For sure, if there is redundant slurm_id.batch or slurm_id.extern
             # Get job status
             job_statuses.append(elements[3])
@@ -706,7 +591,10 @@ def slurm_helper_read_slurm_job_array(lines):
         index += 1
         try:
             line = lines[index]  # may throw index error
-            elements = line.split()
+            elements = slurm_split_job_line(line)
+            if len(elements) < 4:
+                out_of_range = True
+                continue
             slurm_id = elements[1].split('.') # may throw index error when a blank line is read
         except IndexError:
             out_of_range = True
@@ -714,7 +602,9 @@ def slurm_helper_read_slurm_job_array(lines):
 
     # Process job_statuses
     final_status = 1
-    if 'FAILED' in job_statuses \
+    if not job_statuses:
+        return final_status, max(index, 1)
+    elif 'FAILED' in job_statuses \
         or 'NODE_FAIL' in job_statuses \
             or 'OUT_OF_MEMORY' in job_statuses \
                 or 'PREEMPTED' in job_statuses \
@@ -754,14 +644,14 @@ def slurm_parse_slurm_job_lines(output, cluster_type, job_type):
     
     while line_idx < len(lines):
         line = lines[line_idx]
-        elements = line.split()
+        elements = slurm_split_job_line(line)
         
         if len(elements) < 2:
             line_idx += 1
             continue
             
         try:
-            job_name = elements[0].split(".")[0]
+            job_name = slurm_get_job_name(elements)
             slurm_id_parts = elements[1].split('.')
         except IndexError:
             line_idx += 1
@@ -792,6 +682,28 @@ def slurm_parse_slurm_job_lines(output, cluster_type, job_type):
     return jobs_data
 
 
+def slurm_split_job_line(line):
+    """Split grep-prefixed .job lines while preserving the job file name."""
+    elements = line.split()
+    if not elements:
+        return elements
+
+    if ':' in elements[0]:
+        job_file, first_value = elements[0].split(':', 1)
+        elements[0] = job_file
+        if first_value:
+            elements.insert(1, first_value)
+
+    return elements
+
+
+def slurm_get_job_name(elements):
+    """Get the BRaaS job directory name from a parsed .job line."""
+    if elements[0].endswith('.job'):
+        return elements[0][:-4]
+    return elements[0].split(".")[0]
+
+
 def slurm_is_header_or_separator_line(elements):
     """Check if line is a header or separator line."""
     return (len(elements) > 1 and 
@@ -805,6 +717,8 @@ def slurm_process_job_entry(lines, job_name, elements, slurm_id_parts, cluster_t
         Tuple of (job_data_dict, lines_consumed)
     """
     if len(elements) < 7:
+        if cluster_type == 'SCEBE' and len(elements) >= 6:
+            return slurm_process_scebe_job(job_name, elements, cluster_type, job_type, job_index), 1
         return None, 1
     
     # Check for job arrays
@@ -821,6 +735,22 @@ def slurm_process_job_entry(lines, job_name, elements, slurm_id_parts, cluster_t
         return slurm_process_submitted_job(job_name, elements, cluster_type, job_type, job_index), 1
     
     return None, 1
+
+
+def slurm_process_scebe_job(job_name, elements, cluster_type, job_type, job_index):
+    """Process SCEBE squeue/fallback job entries."""
+    status = slurm_map_slurm_status(elements[3])
+    project_name = elements[2]
+
+    job_data = slurm_helper_raas_dict_jobs(job_index, job_name, project_name, cluster_type, job_type, status)
+    job_data.update({
+        'CreationTime': elements[4],
+        'SubmitTime': elements[4],
+        'StartTime': elements[5],
+        'EndTime': elements[6] if len(elements) > 6 else 'unknown'
+    })
+
+    return job_data
 
 
 def slurm_process_job_array(lines, job_name, elements, cluster_type, job_type, job_index):
@@ -924,184 +854,3 @@ def update_job_list(context, jobs_data):
 
 
 #########################################################################################
-
-def pbs_parse_pbs_job_lines(output, cluster_type, job_type):
-    """Parse PBS job output lines into job data structures.
-    
-    Args:
-        output: Raw command output
-        cluster_type: Type of cluster
-        job_type: Type of job
-        
-    Returns:
-        List of job dictionaries
-    """
-    lines = [line for line in output.split('\n') if line.strip()]
-    if not lines:
-        return []
-    
-    jobs_data = []
-    jobs_dict = {}
-    job_index = 0
-    
-    for line in lines:
-        if not line.strip():
-            continue
-            
-        # Extract job name and property
-        parts = line.split(':', 1)
-        if len(parts) < 2:
-            continue
-            
-        job_file = parts[0]
-        job_name = job_file.replace('.job', '')
-
-        property_line = ''
-        property_line = parts[1].strip() #+ ' ' + parts[2].strip()
-        
-        # Initialize job if not exists
-        if job_name not in jobs_dict:
-            jobs_dict[job_name] = pbs_create_pbs_job_dict(job_index, job_name, cluster_type, job_type)
-            jobs_data.append(jobs_dict[job_name])
-            job_index += 1
-        
-        job_data = jobs_dict[job_name]
-        
-        # Parse different properties
-        pbs_parse_pbs_property(job_data, property_line)
-    
-    return jobs_data
-
-
-def pbs_create_pbs_job_dict(job_index, job_name, cluster_type, job_type):
-    """Create initial PBS job dictionary."""
-    # Extract project name from job name (after timestamp)
-    name_parts = job_name.split('-')
-    if len(name_parts) >= 4:
-        project_name = '-'.join(name_parts[3:])
-    else:
-        project_name = job_name
-    
-    return {
-        'Id': job_index,
-        'Name': job_name,
-        'Project': project_name,
-        'ClusterName': cluster_type,
-        # 'JobType': job_type,
-        'State': 1,  # Default to CONFIGURING
-        'CreationTime': '',
-        'SubmitTime': '',
-        'StartTime': '',
-        'EndTime': ''
-    }
-
-
-def pbs_parse_pbs_property(job_data, property_line):
-    """Parse a single PBS property line and update job data."""
-    
-    if property_line.startswith('Job Id:'):
-        # Extract PBS job ID
-        job_id = property_line.split('Job Id:')[1].strip()
-        job_data['PBS_JobId'] = job_id
-        
-    elif property_line.startswith('Job_Name ='):
-        # Extract job name
-        job_name = property_line.split('Job_Name =')[1].strip()
-        job_data['PBS_JobName'] = job_name
-        
-    elif property_line.startswith('job_state ='):
-        # Extract and map job state
-        state = property_line.split('job_state =')[1].strip()
-        job_data['State'] = pbs_map_pbs_status(state)
-        
-    elif property_line.startswith('ctime ='):
-        # Creation time
-        ctime = property_line.split('ctime =')[1].strip()
-        job_data['CreationTime'] = ctime
-        job_data['SubmitTime'] = ctime  # PBS uses ctime as submit time
-        
-    elif property_line.startswith('qtime ='):
-        # Queue time (when job was queued)
-        qtime = property_line.split('qtime =')[1].strip()
-        job_data['StartTime'] = qtime
-        
-    elif property_line.startswith('mtime ='):
-        # Modification time (often when job finished)
-        mtime = property_line.split('mtime =')[1].strip()
-        # if len(job_data['StartTime']) == 0:
-        #     job_data['StartTime'] = mtime
-        
-        if job_data['State'] == 16:  # FINISHED
-            job_data['EndTime'] = mtime
-        
-    # elif property_line.startswith('exec_host ='):
-    #     # Execution host (indicates job started)
-    #     exec_host = property_line.split('exec_host =')[1].strip()
-    #     job_data['PBS_ExecHost'] = exec_host
-    #     # If we have exec_host, job has started
-    #     if not job_data.get('StartTime'):
-    #         job_data['StartTime'] = job_data.get('SubmitTime', '')
-            
-    elif property_line.startswith('queue ='):
-        # Queue name
-        queue = property_line.split('queue =')[1].strip()
-        job_data['PBS_Queue'] = queue
-        
-    elif property_line.startswith('Account_Name ='):
-        # Account/Project name
-        account = property_line.split('Account_Name =')[1].strip()
-        job_data['PBS_Account'] = account
-        
-    elif property_line.startswith('resources_used.walltime ='):
-        # Wall time used
-        walltime = property_line.split('resources_used.walltime =')[1].strip()
-        job_data['PBS_WalltimeUsed'] = walltime
-        
-    elif property_line.startswith('resources_used.ncpus ='):
-        # Number of CPUs used
-        ncpus = property_line.split('resources_used.ncpus =')[1].strip()
-        job_data['PBS_NCpusUsed'] = ncpus
-
-
-def pbs_map_pbs_status(pbs_status):
-    """Map PBS job states to internal status codes.
-    
-    PBS job states:
-    - Q: Queued
-    - R: Running
-    - H: Held
-    - E: Exiting
-    - F: Finished
-    - C: Completed
-    - S: Suspended
-    - T: Transiting
-    - W: Waiting
-    
-    Args:
-        pbs_status: PBS status code
-        
-    Returns:
-        Internal status code
-    """
-    # Internal status codes:
-    # 1: CONFIGURING
-    # 2: SUBMITTED  
-    # 4: QUEUED
-    # 8: RUNNING
-    # 16: FINISHED
-    # 32: FAILED
-    # 64: CANCELED
-    
-    status_map = {
-        'Q': 4,   # QUEUED
-        'H': 4,   # QUEUED (held)
-        'W': 4,   # QUEUED (waiting)
-        'R': 8,   # RUNNING
-        'S': 8,   # RUNNING (suspended, but still allocated)
-        'T': 8,   # RUNNING (transiting)
-        'E': 8,   # RUNNING (exiting)
-        'C': 16,  # FINISHED (completed)
-        'F': 16,  # FINISHED
-    }
-    
-    return status_map.get(pbs_status.upper(), 1)  # Default to CONFIGURING

@@ -1,319 +1,313 @@
-# BRaaS-HPC (Bheappe Add-on v. 2.0) - Blender Rendering-as-a-Service for HPC
+﻿# BRaaS-HPC ENU Rendering Add-on
 
-#### BLENDER ADD-ON TO EXTEND ITS CAPABILITIES IN TERMS OF RENDERING ON AN HPC CLUSTER
+A Blender add-on for submitting Cycles render jobs to Edinburgh Napier University HPC resources, including ENUCC and the SCEBE GPU server.
 
-We provide a Python add-on for Blender that can re-formulate a typical user scene rendering task into a specific HPC computational job, which currently works only as an SSH remote client. This add-on has been developed at [IT4Innovations National Supercomputing Center](https://www.it4i.cz/).
+This project is a fork of the original [BRaaS-HPC](https://github.com/It4innovations/braas-hpc) project from IT4Innovations. The fork adapts the add-on for direct SSH-based rendering workflows on Edinburgh Napier University infrastructure, with current bundled Slurm scripts for `scebe-gpu-server`.
+
+## What It Does
+
+The add-on packages a Blender scene, copies it to a remote HPC system over SSH, submits a Slurm render job, tracks job state, and downloads rendered outputs and logs back to the local workstation.
+
+It is intended for artists, researchers, and technical users who want to render Blender scenes on remote CPU/GPU resources without manually writing Slurm scripts for each job.
+
+## Supported Targets
+
+| Target | Scheduler | Status |
+| --- | --- | --- |
+| SCEBE GPU Server | Slurm | Supported by bundled scripts |
+| ENUCC | HPC/Slurm-style target | Intended target for this fork |
+
+Current bundled scripts are in:
+
+```text
+scripts/scebe-gpu-server-slurm/
+```
+
+The current SCEBE server configuration uses:
+
+```text
+Host: scebe-gpu-server
+Address: 146.176.131.129
+Partition: LocalQ
+Scheduler: Slurm
+```
 
 ## Key Features
-- **Multiple HPC Cluster Support**: Connect to various supercomputing facilities including:
-    - Support of Slurm-based HPC clusters:
-        - Support of [Barbora](https://www.it4i.cz/en/infrastructure/barbora) supercomputer
-        - Support of [Karolina](https://www.it4i.cz/en/infrastructure/karolina) supercomputer
-        - Support of [LUMI](https://lumi-supercomputer.eu) supercomputer
-        - Support of [Leonardo](https://www.hpc.cineca.it/systems/hardware/leonardo) supercomputer
-        - Support of [MareNostrum 5](https://www.bsc.es/marenostrum/marenostrum-5) supercomputer
-        - Support of [Vista](https://tacc.utexas.edu/systems/vista) supercomputer
-        - Support of [Frontera](https://tacc.utexas.edu/systems/frontera) supercomputer
 
-    - Support of PBS-based HPC clusters:
-        - Support of [Polaris](https://www.alcf.anl.gov/polaris) supercomputer
-        - Support of [Aurora](https://www.alcf.anl.gov/aurora) supercomputer
-
-- **Flexible Authentication**: Support for multiple SSH connection methods:
-  - Paramiko (Python SSH library)
-  - AsyncSSH (Asynchronous SSH)
-  - System (SSH installed in the user system)
-
-- **Job Management**: 
-  - Submit single image or animation rendering jobs
-  - Monitor job status in real-time
-  - Cancel running jobs
-  - Download rendered outputs and log files
-  - View detailed job information and progress
-
-- **Resource Configuration**:
-  - Configure multiple cluster presets (allocation, partition, queue)
-  - Specify walltime, CPU/GPU resources
-  - Support for job arrays for parallel frame rendering
-  - Customizable working directories per cluster
-
-- **File Handling**:
-  - Automatic packing of Blender files with dependencies
-  - Support for external file structures
-  - Secure file transfer via SSH/SCP
+- Submit Blender render jobs from inside Blender.
+- Render single images or animations.
+- Support CPU and GPU render modes.
+- Use Slurm job submission on the remote server.
+- Package `.blend` files with external resources before upload.
+- Transfer job files over SSH/SCP-style connections.
+- Monitor submitted jobs from the Blender UI.
+- Cancel queued or running jobs.
+- Download rendered outputs, logs, and job metadata.
+- Write add-on logs to a persistent Blender config log file.
+- Supports Paramiko, AsyncSSH, and system SSH modes.
 
 ## Requirements
 
-### System Requirements
-- **Blender**: Version 4.0.0 or higher
-- **Python**: 3.x (bundled with Blender)
-- **Operating System**: Windows, Linux, or macOS
+### Local Machine
 
-### HPC Access Requirements
-- Active account on one or more supported HPC clusters
-- SSH access credentials (username + private key with passphrase)
-- Allocated project/allocation ID on the target cluster
-- Network connectivity to the HPC facility
+- Blender 4.0 or newer.
+- Python bundled with Blender.
+- Network access to the target HPC server.
+- SSH credentials for the target system.
+- A local directory for job storage.
 
 ### Python Dependencies
-The addon requires the following Python packages (can be installed via the addon preferences):
-- `paramiko` - SSH protocol implementation
-- `scp` - Secure file copy functionality
-- `asyncssh` - Asynchronous SSH client/server  
+
+The add-on can install these from Blender preferences:
+
+- `paramiko`
+- `scp`
+- `asyncssh`
+
+### Remote HPC System
+
+The remote system needs:
+
+- SSH access for your user account.
+- Slurm commands available, such as `sbatch`, `squeue`, and `scancel`.
+- Blender installed at `~/blender/blender`, or installed through the add-on setup workflow.
+- The render helper scripts installed under `~/braas-hpc/scripts/...`.
+- A writable working directory, usually under your home directory or project storage.
+
+For SCEBE, Slurm accounting may be disabled, so the add-on uses `squeue` and local `.job` files rather than relying on `sacct`.
 
 ## Installation
 
-### Step 1: Download the Addon
+### 1. Package The Add-on
 
-Download the add-on in zip format: https://github.com/It4innovations/braas-hpc/releases
+From the repository root, create a zip containing the Blender add-on folder:
 
-### Step 2: Install in Blender
+```powershell
+Compress-Archive -Path addons\braas_hpc -DestinationPath braas_hpc.zip -Force
+```
 
-1. Open Blender (version 4.0 or higher)
+The zip should contain this structure:
 
-2. Go to **Edit → Preferences** (or **Blender → Preferences** on macOS)
+```text
+braas_hpc/
+  __init__.py
+  raas_config.py
+  raas_render.py
+  ...
+```
 
-3. Select the **Add-ons** tab
+Do not zip the whole repository unless the top-level folder inside the zip is `braas_hpc`.
 
-4. Click **Install...** button at the top
+### 2. Install In Blender
 
-5. Navigate to the `braas_hpc.zip` file and install it
+1. Open Blender.
+2. Go to `Edit > Preferences > Add-ons`.
+3. Click `Install...`.
+4. Select `braas_hpc.zip`.
+5. Enable `System: BRaaS-HPC`.
 
-6. Enable the addon by checking the checkbox next to **System: BRaaS-HPC**
+### 3. Install Dependencies
 
-### Step 3: Install Python Dependencies
+In the add-on preferences:
 
-1. In Blender Preferences, expand the **BRaaS-HPC** addon settings
+1. Expand `BRaaS-HPC`.
+2. Click `Install Dependencies`.
+3. Restart Blender if prompted.
 
-2. Scroll to the **Dependencies** section
+### 4. Configure A Cluster Preset
 
-3. Click **Install Dependencies** button
+In `Edit > Preferences > Add-ons > BRaaS-HPC`:
 
-4. Wait for the installation to complete (this may take a few minutes)
+1. Add a cluster preset.
+2. Select the cluster, for example `SCEBE GPU Server`.
+3. Set the partition, for example `LocalQ`.
+4. Select job type, usually `GPU` for SCEBE rendering.
+5. Enter your remote username.
+6. Configure SSH authentication.
+7. Set or discover the working directory.
+8. Enable the preset.
 
-5. Restart Blender after installation
+For SCEBE, allocation/account can normally be left blank if the local Slurm configuration does not require `--account`.
 
-### Step 4: Configure HPC Access
+### 5. Install Scripts And Blender On The Server
 
-BRaaS-HPC add-on properties can be set in ***Blender Preferences*** menu, see figure below.
-    
-![](img/preferences.png)
+In the add-on preferences:
 
+1. Set the scripts repository URL and branch.
+2. Set the Blender Linux tarball URL if Blender is not already installed remotely.
+3. Click `Install scripts and Blender on the cluster(s)`.
+4. Alternatively, install manually and enable `Scripts already installed`.
 
-#### Add Cluster Preset
+Expected remote paths for SCEBE:
 
-1. In the addon preferences, scroll to the **Cluster Presets** section
-
-2. Click the **+** button to add a new cluster preset
-
-3. Configure the preset with:
-   - **Cluster Name**: Select your target HPC cluster
-   - **Allocation Name**: Your project/allocation ID
-   - **Partition Name**: Queue/partition to use
-   - **Job Type**: CPU or GPU rendering
-   - **Username**: Your HPC username
-   - **SSH Library**: Choose authentication method (AsyncSSH recommended)
-   - **Private Key Path**: Path to your SSH private key file
-   - **Private Key Password**: Passphrase for your private key
-
-4. Enable the preset by checking the **Is Enabled** checkbox (after **Find Working Directories**)
-
-#### Configure Job Storage
-
-1. Set **Job Storage Path**: Local directory where job files will be stored
-   - Example: `C:\Users\YourName\BRaaS_Jobs` (Windows)
-   - Example: `/home/yourname/braas_jobs` (Linux)
-
-2. The addon will create subdirectories for each job submission
-
-#### Find Working Directories
-
-1. Click the **Find Working Dirs** button to automatically discover your project directories on configured clusters
-
-2. This will populate the **Working Dir** field for each enabled cluster preset
-
-#### Install Scripts on Clusters
-
-1. Configure the **Git Repository (Scripts)** field with the rendering scripts repository:
-   - Default: `https://github.com/It4innovations/braas-hpc.git`
-   - Branch: `main`
-
-2. Set the **Link (Blender)** to the Blender version to use on the cluster:
-   - Example: `https://ftp.nluug.nl/pub/graphics/blender/release/Blender4.5/blender-4.5.5-linux-x64.tar.xz`
-
-3. Click **Install scripts and Blender on the cluster(s)** button
-
-4. After successful installation, check the **Manual Installation / Scripts already installed** checkbox
-
-#### Test Connection
-
-1. Click the **Test Connections** button to verify connectivity to all enabled cluster presets
-
-2. Check the Blender Info Editor or System Console for connection results
-
+```text
+~/braas-hpc/scripts/scebe-gpu-server-slurm/
+~/blender/blender
+```
 
 ## Usage
 
-Once configured, you can submit rendering jobs directly from Blender's Render Properties panel. Add-on supports *Cycles* rendering only. Thus it is available only in case *Cycles* is selected as *Render Engine*.
+### 1. Open The Add-on Panel
 
-***BRaaS-HPC*** menu is divided in ***Status***, ***New Job*** and ***Jobs*** menus.
-See figure below. 
+1. Open your Blender scene.
+2. Set render engine to `Cycles`.
+3. Open the `Render Properties` tab.
+4. Expand `BRaaS-HPC`.
 
-![](img/addon-1.png)
+### 2. Configure The Job
 
-***Status*** menu provides user with information about progress of ongoing action, e.g., sending query for job update etc.
+In `New Job`:
 
-***New Job*** menu enables to define details about a rendering job and submit this job to the selected remote cluster. The particular cluster, allocation and HW partition is selected in the correspoding table. Users can set a project name, specify their email to receive notifications when job is done (only in case you have been assigned computational resources and this email address was used), specify execution parameters (see below) and choose whether to render only a single image or sequence of images (animation).
+- Select the cluster preset.
+- Enter a project/job name.
+- Choose `Image` or `Animation`.
+- Choose `CPU` or `GPU` depending on the preset.
+- Set walltime in minutes.
+- For animations, set frame range and max jobs.
 
-***Jobs*** menu provides an overview about the submitted jobs showing their actual states and target remote machines. If some particular job from the list in the ***Jobs*** menu is selected, users can download the results to their local folder and browse them by opening a file explorer via a corresponding button. Final and partial results may be downloaded if exist. Jobs in the list that are not finalized can be cancelled on demand by selection the row with the particular job and pressing "Cancel" button. Pressing "Refresh" button refreshes the statuses of jobs. Pressing this button is required from time to time because this action is not provided automatically. Sometimes users are encouraged to perform the refresh action, e.g., after submitting a new job because it may take a while until a new job is initiated on the remote site and can be monitored.
+For a single image, the current frame is rendered.
 
-![](img/addon-2.png)
+For an animation, frames are submitted through a Slurm array. Each array task renders part of the frame range. For SCEBE GPU jobs, each task requests one GPU.
 
-### Accessing the BRaaS-HPC Panel
+### 3. Submit The Job
 
-1. Open a Blender project with a scene ready to render
+Click `Submit Job`.
 
-2. Go to the **Render Properties** tab (camera icon in Properties panel)
+The add-on will:
 
-3. Scroll down to find the **BRaaS-HPC** section
+1. Save a temporary packed `.blend` file.
+2. Copy the job directory to the remote server.
+3. Submit init, render, and finish jobs through Slurm.
+4. Create/update a `.job` status file.
+5. Refresh the job list.
 
-4. Expand the **New Job** sub-panel
+### 4. Monitor Jobs
 
-### Submitting a Rendering Job
+Use the `Jobs` panel:
 
-#### Step 1: Select Cluster Configuration
+- Click `Refresh` to reload job states.
+- Select a job to see details.
+- Use `Cancel` to stop a queued or running job.
 
-1. In the **New Job** panel, you'll see a table of available cluster presets
+Known states include:
 
-2. Select the cluster preset you want to use by clicking on it
+- `CONFIGURING`
+- `QUEUED`
+- `RUNNING`
+- `FINISHED`
+- `FAILED`
+- `CANCELED`
 
-3. The table shows:
-   - **Allocation**: Your project ID
-   - **Cluster**: The HPC facility name
-   - **Partition**: Queue/partition
-   - **Type**: CPU or GPU
+### 5. Download Results
 
-#### Step 2: Configure Job Parameters
+Select a job and click `Download results`.
 
-1. **Job Project**: Enter a descriptive name for your job (max 25 characters)
+The add-on downloads:
 
-2. **Job Email**: (Optional) Email address for job notifications
+```text
+out/   rendered frames or images
+log/   Blender stdout/stderr logs
+job/   job metadata
+```
 
-3. **Render Type**: Choose between:
-   - **Image**: Render a single frame
-   - **Animation**: Render a frame range
+Files are stored under the local job storage directory configured in add-on preferences.
 
-4. **File Type**: Select how to package your Blender file:
-   - **Packed .blend file**: All textures and dependencies packed into one file (recommended)
-   - **Sources in directory**: Separate .blend file with external dependencies
+## SCEBE Render Scripts
 
-5. **Walltime [minutes]**: Maximum time for the job to run (1-2880 minutes)
-   - Set this based on your scene complexity
-   - Jobs exceeding walltime will be terminated
+The SCEBE script set contains:
 
-#### Step 3: Configure Frame Settings
+```text
+job_init.sh
+run_blender_cpu.sh
+run_blender_gpu.sh
+job_finish.sh
+use_gpu.py
+```
 
-**For Single Image Rendering:**
-- The current frame (`frame_current`) will be rendered
+`run_blender_gpu.sh` runs Blender in background mode with Cycles and executes `use_gpu.py` to select GPU rendering.
 
-**For Animation Rendering:**
-- **Max Jobs**: Maximum number of parallel rendering tasks (1-10000)
-- **Frame Start**: First frame to render
-- **Frame End**: Last frame to render
-- **Job Arrays**: (Optional) Custom frame array specification
-  - Example: `1-100:10` renders frames 1, 11, 21, ..., 91
-  - Leave empty for automatic frame distribution
+Animation jobs render frames as individual frame outputs. The add-on does not stitch frames into a video. If you need a video file, render frames first and assemble them afterward using Blender, FFmpeg, or another tool.
 
-#### Step 4: Submit the Job
+## Logging
 
-1. Review all settings carefully
+The add-on writes logs to Blender's user config directory:
 
-2. Click the **Submit Job** button (with animation icon)
+```text
+C:\Users\<user>\AppData\Roaming\Blender Foundation\Blender\<version>\config\braas_hpc\braas_hpc.log
+```
 
-3. The addon will:
-   - Pack your Blender file (if needed)
-   - Upload files to the HPC cluster
-   - Submit the job to the queue
-   - Return a Job ID for tracking
+For example:
 
-4. Monitor the status bar at the top of the panel:
-   - **Status**: Shows current operation (IDLE, UPLOADING, RUNNING, etc.)
-   - **Progress bar**: Displays operation progress
+```text
+C:\Users\40021033\AppData\Roaming\Blender Foundation\Blender\5.1\config\braas_hpc\braas_hpc.log
+```
 
-### Monitoring Jobs
+Use this log when debugging submit, transfer, SSH, or job-list issues. Python tracebacks are written there for operator failures.
 
-#### View Job List
+## Troubleshooting
 
-1. Expand the **Jobs** sub-panel in BRaaS-HPC section
+### Add-on Does Not Appear In Blender
 
-2. Click **List Jobs** to retrieve all your submitted jobs
+Check the zip structure. Blender must see `braas_hpc/__init__.py` at the top level inside the zip.
 
-3. The jobs list displays:
-   - **ID**: Unique job identifier
-   - **Project**: Job name
-   - **Cluster**: Target HPC facility
-   - **State**: Job status (CONFIGURING, QUEUED, RUNNING, FINISHED, FAILED, CANCELED)
+### Test Connection Is Skipped
 
-#### Check Job Details
+The selected preset is disabled. In add-on preferences, check:
 
-1. Select a job from the list by clicking on it
+- Username is set.
+- SSH key/password settings are valid.
+- Working directory is set.
+- Preset is enabled.
 
-2. Click **Show Info** to view detailed job information:
-   - Submission time
-   - Start time
-   - End time
-   - Allocated resources
-   - All job parameters
+### Job Stays Pending With `InvalidAccount`
 
-#### Download Results
+On SCEBE, do not submit with a Slurm account unless the server administrator has configured one for your user. The SCEBE path in this fork omits `--account`.
 
-1. Select a finished job from the list
+### Slurm Accounting Is Disabled
 
-2. Click **Download Files** to retrieve:
-   - Rendered output images (in `/out` folder)
-   - Log files (in `/log` folder)
-   - Job information files (in `/job` folder)
+If `sacct` fails, this is expected on SCEBE. The add-on uses `squeue` and `.job` files instead.
 
-3. Files will be downloaded to your local Job Storage Path in a timestamped subfolder
+### No Jobs Appear In The Job List
 
-#### Cancel a Job
+Check the remote job files:
 
-1. Select a running or queued job
+```bash
+ls -la ~/braas-hpc/direct/<username>/scebe/*.job
+cat ~/braas-hpc/direct/<username>/scebe/*.job
+```
 
-2. Click **Cancel Job** to terminate the job on the cluster
+The add-on parses these `.job` files to populate the Blender job list.
 
-3. The job state will change to CANCELED
+### GPU Render Does Not Use The GPU
 
-### Managing Jobs
+Check the remote log files in the job `log/` directory. Also confirm:
 
-- **Refresh Status**: Click **List Jobs** again to update job states
-- **Filter Jobs**: Use the search box above the job list to filter by name
-- **Abort Operation**: If an operation is stuck, click the **Cancel** button (X icon) next to the progress bar
+- The job type is `GPU`.
+- The Slurm submission includes `--gres=gpu:1`.
+- Blender can see the GPU on the remote server.
+- `use_gpu.py` is installed in the expected scripts directory.
 
+## Project Layout
 
-# Usage & User Projects
-- **Chora** by Gaia Radić: [Aksioma](https://aksioma.org/chora), [GaiaRadic](https://www.gaiaradic.com/chora)
-- **Dejvický kampus** by Michal Faltýnek: [Akademik](https://www.vsb.cz/magazin/cs/detail-novinky/?reportId=49300)
-- **Holograms**: [Youtube](https://www.youtube.com/watch?v=PKPoO_0nNYA), [GitLab (private project)](https://code.it4i.cz/svo0120/holograms)
-- **InfraLab Portfolio**: [IT4I](https://www.it4i.cz/en/infrastructure/visualization-and-virtual-reality-labs/examples-of-our-visualizations)
-- **InnovAIte Slovakia: Illuminating Pathways for AI‑Driven Breakthroughs**: [InnovAIte](https://innovaite.sk/)
-- **Massively parallel implementation of algorithms for computer graphics**: PhD Thesis by Milan Jaroš
-- **Railway simulator for obsacle detection project**: [IT4I News 1](https://www.it4i.cz/en/about/infoservice/news/railway-simulator-for-obsacle-detection-project), [IT4I News 2](https://www.it4i.cz/en/about/infoservice/news/simulator-of-railway-track-conditions-can-help-enhance-railway-safety), [GitLab](https://code.it4i.cz/tacr/simulator)
-- **Research Excellence For REgion Sustainability and High-tech Industries**: [REFRESH](https://www.smaragdova.cz/refresh/)
-- **Scalable Parallel Astrophysical Codes for Exascale**: [SPACE CoE](https://www.space-coe.eu)
-- **Spring**: [Youtube](https://www.youtube.com/watch?v=WhWc3b3KhnY&t=1s)
-- **Synthetic SEM image generator**: [GitLab](https://code.it4i.cz/SEM-Image/segment_sem_images_hctpm)
-- **Workflow for high-quality visualisation of large-scale CFD simulations by volume rendering**: [Paper](https://doi.org/10.1016/j.advengsoft.2024.103822), [Zenodo](https://zenodo.org/records/13639352)
-- **ELI Beamlines**: [9th Users’ Conference of IT4Innovations](https://events.it4i.cz/event/346/attachments/820/2889/01_Valenta_Petr_Machine-learning%20optimization%20of%20laser-driven%20electron%20accelerators.pdf)
-- ...
+```text
+addons/braas_hpc/                  Blender add-on source
+scripts/scebe-gpu-server-slurm/    SCEBE Slurm render scripts
+img/                               README/UI images from the original project
+doc/                               Additional documentation
+```
 
+## Fork Notice
 
-# License
-This software is licensed under the terms of the [GNU General Public License](https://github.com/It4innovations/braas-hpc/blob/main/LICENSE).
+This repository is a fork of BRaaS-HPC. The original project was developed by IT4Innovations National Supercomputing Center.
 
+Original project:
 
-# Acknowledgement
-This work was supported by the Ministry of Education, Youth and Sports of the Czech Republic through the e-INFRA CZ (ID:90254).
+```text
+https://github.com/It4innovations/braas-hpc
+```
 
-This work was supported by the SPACE project. This project has received funding from the European High- Performance Computing Joint Undertaking (JU) under grant agreement No 101093441. This project has received funding from the Ministry of Education, Youth and Sports of the Czech Republic (ID: MC2304).
+This fork is adapted for Edinburgh Napier University HPC rendering workflows.
 
+## License
+
+This project follows the license of the original BRaaS-HPC project. See [LICENSE](LICENSE).

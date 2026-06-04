@@ -25,11 +25,39 @@ bl_info = {
 }
 
 import logging
+from pathlib import Path
+
+import bpy
 
 log = logging.getLogger(__name__)
 
+
+def _setup_file_logging():
+    """Write addon logs to Blender's user config directory."""
+
+    logger = logging.getLogger(__package__ or __name__)
+    log_path = Path(bpy.utils.user_resource('CONFIG', path="braas_hpc", create=True)) / "braas_hpc.log"
+    log_path_str = str(log_path)
+
+    for handler in logger.handlers:
+        if isinstance(handler, logging.FileHandler) and handler.baseFilename == log_path_str:
+            return log_path
+
+    handler = logging.FileHandler(log_path, encoding="utf-8")
+    handler.setLevel(logging.INFO)
+    handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s [%(name)s] %(message)s"))
+
+    logger.setLevel(logging.INFO)
+    logger.addHandler(handler)
+    logger.propagate = True
+
+    return log_path
+
 def register():
     """Late-loads and registers the Blender-dependent submodules."""
+
+    log_path = _setup_file_logging()
+    log.info("BRaaS-HPC logging to %s", log_path)
 
     from . import async_loop
     from . import raas_pref

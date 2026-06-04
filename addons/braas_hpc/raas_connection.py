@@ -16,7 +16,6 @@
 #
 # ##### END GPL LICENSE BLOCK #####
 
-# (c) IT4Innovations, VSB-TUO
 
 
 import functools
@@ -41,10 +40,7 @@ import time
 ################################
 
 import bpy
-# from bpy.types import AddonPreferences, Operator, WindowManager, Scene, PropertyGroup, Panel
-# from bpy.props import StringProperty, EnumProperty, PointerProperty, BoolProperty, IntProperty
 
-# from bpy.types import Header, Menu
 
 from . import async_loop
 from . import raas_server
@@ -118,9 +114,11 @@ def get_project_group(context):
     pref = raas_pref.preferences()
     project_group = pref.raas_project_group
     if len(project_group) == 0:
-        if context.scene.raas_cluster_presets_index > -1 and len(pref.cluster_presets) > 0:
-            preset = pref.cluster_presets[context.scene.raas_cluster_presets_index]
+        try:
+            preset = raas_pref.get_selected_cluster_preset(context)
             project_group = preset.raas_da_username
+        except ValueError:
+            project_group = ''
 
     if len(project_group) == 0:
         import getpass        
@@ -132,13 +130,10 @@ def get_project_group(context):
     return project_group
 
 def get_direct_access_remote_storage(context):
-    # pref = raas_pref.preferences()
     project_group = get_project_group(context)
 
-    #pid_name, pid_queue, pid_dir = raas_config.GetCurrentPidInfo(context, raas_pref.preferences())
     pid_name, pid_queue, pid_dir = context.scene.raas_config_functions.call_get_current_pid_info(context, raas_pref.preferences())
 
-    #path = raas_config.GetDAClusterPath(context, pid_dir, pid_name.lower())
     path = context.scene.raas_config_functions.call_get_da_cluster_path(context, pid_dir, pid_name.lower())
 
     return path + '/' + project_group + '/' + context.scene.raas_blender_job_info_new.cluster_type.lower()
@@ -361,8 +356,6 @@ class SSHCommand(SSHProcess):
 
         cmd.append(self.user_host)
         # Wrap command in bash -c to properly handle shell metacharacters
-        # cmd.append("bash")
-        # cmd.append("-c")
         cmd.append(self.command)
         return cmd
 
@@ -439,7 +432,6 @@ class SSHCommandJump(SSHCommand):
         self.jump_host = jump_host
         self.local_port = int(local_port)
         self.remote_port = int(remote_port)
-        #self.remote_host = remote_host       
         
         # Now call parent constructor
         super().__init__(
@@ -475,8 +467,6 @@ class SSHCommandJump(SSHCommand):
 
         cmd.append(self.user_host)
         # Wrap command in bash -c to properly handle shell metacharacters
-        # cmd.append("bash")
-        # cmd.append("-c")
         cmd.append(self.command)
         return cmd        
 
@@ -678,7 +668,6 @@ class RaasSession:
  
         ssh = None
         try: 
-            #ssh = paramiko.SSHClient()
             ssh = Custom2FASSHClient(password=self.password, totp_code=self.password_2fa)           
             ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
             ssh.load_system_host_keys()
@@ -693,13 +682,8 @@ class RaasSession:
                     allow_agent=False         # don’t use ssh-agent
                 )                
             else:                
-                # try:
-                #     key = paramiko.RSAKey.from_private_key_file(self.key_file, self.key_file_password)
-                # except:
-                #     key = paramiko.Ed25519Key.from_private_key_file(self.key_file, self.key_file_password)
                 from io import StringIO
                 try:
-                    #key = paramiko.RSAKey.from_private_key_file(key_file, password)
 
                     if self.key_file_password is None or len(self.key_file_password) == 0:
                         key = paramiko.RSAKey.from_private_key_file(self.key_file)
@@ -707,7 +691,6 @@ class RaasSession:
                         key = paramiko.RSAKey.from_private_key_file(self.key_file, self.key_file_password)
 
                 except Exception as e:
-                    #key = paramiko.Ed25519Key.from_private_key_file(key_file, password)                
                     if self.key_file_password is None or len(self.key_file_password) == 0:
                         key = paramiko.Ed25519Key.from_private_key_file(self.key_file)
                     else:
@@ -944,12 +927,6 @@ async def _ssh_async(key_file, server, username, command):
             user_server, command
         ]
 
-    # import asyncio
-    # loop = asyncio.get_event_loop()
-    # process = await asyncio.create_subprocess_exec(*cmd, 
-    #     loop=loop,
-    #     stdout=asyncio.subprocess.PIPE,
-    #     stderr=asyncio.subprocess.PIPE)
         
     import asyncio
     process = await asyncio.create_subprocess_exec(
@@ -957,8 +934,6 @@ async def _ssh_async(key_file, server, username, command):
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE)        
 
-    #await process.wait()
-    #password = '{}\n'.format(password).encode()
     stdout, stderr = await process.communicate()
 
     if process.returncode != 0:
@@ -1046,8 +1021,6 @@ def _ssh_sync(key_file, server, username, command):
 
     import subprocess
     process = subprocess.Popen(cmd, stdin=subprocess.PIPE, stderr=subprocess.PIPE, stdout=subprocess.PIPE)
-    # stdout=proc.stdout.read()
-    # stderr=proc.stderr.read()
     stdout, stderr = process.communicate()
 
     if process.returncode != 0:
@@ -1115,21 +1088,11 @@ def _paramiko_ssh(server, username, key_file, key_file_password, password, use_p
         """ Execute an paramiko ssh command """
 
         import paramiko
-        #from io import StringIO
-        #from base64 import b64decode
-        #from scp import SCPClient
 
         bpy.context.scene.raas_session.show_dialog(server, username, key_file, key_file_password, password, use_password, use_password_2fa, client_type='PARAMIKO')
 
-        #ssh = None
         result = None
         try: 
-            # ssh = paramiko.SSHClient()
-            # ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-            # try:
-            #     key = paramiko.RSAKey.from_private_key_file(key_file, password)
-            # except:
-            #     key = paramiko.Ed25519Key.from_private_key_file(key_file, password)
 
             #ssh.connect(server, username=username, pkey=key)
             ssh = bpy.context.scene.raas_session.paramiko_get_ssh(server)
@@ -1143,12 +1106,9 @@ def _paramiko_ssh(server, username, key_file, key_file_password, password, use_p
             #ssh.close()    
 
         except Exception as e:
-            # if scp is not None:
             #     scp.close()
 
-            # if ssh is not None:
             #     ssh.close()
-            #bpy.context.scene.raas_session.create_session(None)
 
             raise Exception("paramiko ssh command failed:  %s: %s" % (e.__class__, e))    
 
@@ -1302,8 +1262,6 @@ async def ssh_command(server, command, preset):
     if command  is None:
         return None
     
-    #pref = raas_pref.preferences()
-    #preset = pref.cluster_presets[bpy.context.scene.raas_cluster_presets_index]    
             
     username = preset.raas_da_username
     key_file = preset.raas_private_key_path
@@ -1323,8 +1281,6 @@ def ssh_command_sync(server, command, preset):
     if command  is None:
         return None
         
-    #pref = raas_pref.preferences()
-    #preset = pref.cluster_presets[bpy.context.scene.raas_cluster_presets_index]    
         
     username = preset.raas_da_username
     key_file = preset.raas_private_key_path
@@ -1345,8 +1301,6 @@ async def ssh_command_jump(server1, server2, command, preset):
     if command  is None:
         return None
     
-    #pref = raas_pref.preferences()
-    #preset = pref.cluster_presets[bpy.context.scene.raas_cluster_presets_index]    
             
     username = preset.raas_da_username
     key_file = preset.raas_private_key_path
@@ -1366,8 +1320,6 @@ def ssh_command_sync_jump(server1, server2, command, preset):
     if command  is None:
         return None
         
-    #pref = raas_pref.preferences()
-    #preset = pref.cluster_presets[bpy.context.scene.raas_cluster_presets_index]    
         
     username = preset.raas_da_username
     key_file = preset.raas_private_key_path
@@ -1409,13 +1361,10 @@ async def _scp_async(key_file, source, destination):
             ]
 
         import asyncio
-        #loop = asyncio.get_event_loop()
         process = await asyncio.create_subprocess_exec(*cmd, 
-            #loop=loop,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE)
 
-        #await process.wait()
         stdout, stderr = await process.communicate()
 
         if process.returncode != 0:
@@ -1522,27 +1471,11 @@ def _paramiko_put(server, username, key_file, key_file_password, password, use_p
         ssh = None
         scp = None
         try: 
-            # ssh = paramiko.SSHClient()
-            # ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
             # # if password is None:
-            # #     key = paramiko.RSAKey.from_private_key(StringIO(privateKey))
             # # else:
-            # #     key = paramiko.RSAKey.from_private_key_file(privateKey, password)
 
-            # try:
-            #     #key = paramiko.RSAKey.from_private_key_file(key_file, password)
 
-            #     if password is None:
-            #         key = paramiko.RSAKey.from_private_key(StringIO(privateKey))
-            #     else:
-            #         key = paramiko.RSAKey.from_private_key_file(privateKey, password)
 
-            # except:
-            #     #key = paramiko.Ed25519Key.from_private_key_file(key_file, password)                
-            #     if password is None:
-            #         key = paramiko.Ed25519Key.from_private_key(StringIO(privateKey))
-            #     else:
-            #         key = paramiko.Ed25519Key.from_private_key_file(privateKey, password)
 
             # ssh.connect(serverHostname, username=username, pkey=key)
             ssh = bpy.context.scene.raas_session.paramiko_get_ssh(server)
@@ -1551,10 +1484,8 @@ def _paramiko_put(server, username, key_file, key_file_password, password, use_p
             #scp.close()    
 
         except Exception as e:
-            # if scp is not None:
             #     scp.close()
 
-            # if ssh is not None:
             #     ssh.close()
 
             raise Exception("paramiko command failed:  %s: %s" % (e.__class__, e))
@@ -1573,25 +1504,9 @@ def _paramiko_get(server, username, key_file, key_file_password, password, use_p
         ssh = None
         scp = None
         try: 
-            # ssh = paramiko.SSHClient()
-            # ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
             # # if password is None:
-            # #     key = paramiko.RSAKey.from_private_key(StringIO(privateKey))
             # # else:
-            # #     key = paramiko.RSAKey.from_private_key_file(privateKey, password)
 
-            # try:
-            #     #key = paramiko.RSAKey.from_private_key_file(key_file, password)
-            #     if password is None:
-            #         key = paramiko.RSAKey.from_private_key(StringIO(privateKey))
-            #     else:
-            #         key = paramiko.RSAKey.from_private_key_file(privateKey, password)                
-            # except:
-            #     #key = paramiko.Ed25519Key.from_private_key_file(key_file, password)
-            #     if password is None:
-            #         key = paramiko.Ed25519Key.from_private_key(StringIO(privateKey))
-            #     else:
-            #         key = paramiko.Ed25519Key.from_private_key_file(privateKey, password)                
 
             # ssh.connect(serverHostname, username=username, pkey=key)
             ssh = bpy.context.scene.raas_session.paramiko_get_ssh(server)
@@ -1600,10 +1515,8 @@ def _paramiko_get(server, username, key_file, key_file_password, password, use_p
             #scp.close()
 
         except Exception as e:
-            # if scp is not None:
             #     scp.close()
 
-            # if ssh is not None:
             #     ssh.close()
 
             raise Exception("paramiko command failed:  %s: %s" % (e.__class__, e))        
@@ -1624,10 +1537,8 @@ async def end_transfer_files(context, fileTransfer, job_id: int, token: str) -> 
 async def transfer_files(context, fileTransfer, job_local_dir: str, job_remote_dir: str, job_id: int, token: str, to_cluster) -> None:
     """Transfer files."""
 
-    prefs = raas_pref.preferences()
-    preset = prefs.cluster_presets[bpy.context.scene.raas_cluster_presets_index]
+    preset = raas_pref.get_selected_cluster_preset(context)
 
-    # serverHostname = raas_config.GetDAServer(context)
     serverHostname = context.scene.raas_config_functions.call_get_da_server(context)
     cmd = CmdCreateProjectGroupFolder(context)
     
@@ -1663,13 +1574,11 @@ async def transfer_files(context, fileTransfer, job_local_dir: str, job_remote_d
             source = job_local_dir
             destination = '%s/%s' % (str(sharedBasepath), job_remote_dir)
             print('copy from %s to server' % (job_local_dir))
-            #await _paramiko_put(pkey, serverHostname, username, password, source, destination)
             await asyncio.to_thread(_paramiko_put, serverHostname, username, key_file, key_file_password, password, use_password, use_password_2fa, source, destination)
         else:
             destination = job_local_dir
             source = '%s/%s' % (str(sharedBasepath), job_remote_dir)
             print('copy from server to: %s' % (job_local_dir))
-            #await _paramiko_get(pkey, serverHostname, username, password, source, destination)
             await asyncio.to_thread(_paramiko_get, serverHostname, username, key_file, key_file_password, password, use_password, use_password_2fa, source, destination)
 
     else:       

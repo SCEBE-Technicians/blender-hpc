@@ -16,7 +16,6 @@
 #
 # ##### END GPL LICENSE BLOCK #####
 
-# (c) IT4Innovations, VSB-TUO
 
 import functools
 import logging
@@ -25,7 +24,6 @@ import typing
 import signal
 import sys
 import asyncio
-#import aiohttp
 import json
 import requests
 import bpy
@@ -37,14 +35,11 @@ def get_endpoint(endpoint_path=None):
     """Gets the endpoint for the authentication API. If the BHRAAS_SERVER_ENDPOINT env variable
     is defined, it's possible to override the (default) production address.
     """
-    #import os
     from . import raas_pref
     from . import raas_config
     import urllib.parse
     import functools
 
-    #base_url = raas_config.GetServer(raas_pref.preferences().raas_pid.lower())
-    #pid_name, pid_queue, pid_dir = raas_config.GetCurrentPidInfo(bpy.context, raas_pref.preferences())
     pid_name, pid_queue, pid_dir = bpy.context.scene.raas_config_functions.call_get_current_pid_info(bpy.context, raas_pref.preferences())
     base_url = raas_config.GetServer(pid_name.lower())
 
@@ -65,7 +60,6 @@ async def post_json(endpoint, data_json):
     return response.text
 
 async def post(endpoint, data):
-    #import json
     
     data_json = json_dumps(data)  
     resp = await post_json(endpoint, data_json)
@@ -88,7 +82,6 @@ async def get_token(username: str, password: str) -> str:
     if username is None or len(username) < 1 or password is None or len(password) < 1:
         raise Exception('username or password is empty')
 
-    #import json
     data_json = json_dumps(data)
     resp = await post_json("UserAndLimitationManagement/AuthenticateUserPassword", data_json)
     

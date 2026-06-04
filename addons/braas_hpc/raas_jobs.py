@@ -428,7 +428,7 @@ def CmdCreateSLURMJob(context):
 
         custom_flags = context.scene.raas_config_functions.call_get_special_job_flags(context, cluster_id, command_template_id, pid_queue)
         account_arg = ''
-        if context.scene.raas_blender_job_info_new.cluster_type != 'SCEBE':
+        if context.scene.raas_blender_job_info_new.cluster_type not in {'SCEBE', 'ENUCC'}:
             account_arg = ' --account ' + raas_config.GetDAOpenCallProject(pid_name)
 
         cmd = cmd + '_' + str(task_id) + '=$(echo \' ' + script + ' ' + file + ' \' | sbatch' + account_arg + ' --export=' + job_env + ' --nodes=' + \
@@ -474,9 +474,10 @@ def CmdCreateStatSLURMJobFile(context, slurm_jobs):
     if len(slurm_jobs) > 0:
         job_log = raas_connection.get_direct_access_remote_storage(
             context) + '/' + job_name + '.job'
-        if context.scene.raas_blender_job_info_new.cluster_type == 'SCEBE':
-            # SCEBE Slurm accounting is disabled, so sacct fails. squeue only
-            # sees active jobs; the finish script writes the final COMPLETED state.
+        if context.scene.raas_blender_job_info_new.cluster_type in {'SCEBE', 'ENUCC'}:
+            # These direct Slurm targets use squeue-generated job files. The
+            # finish script writes the final COMPLETED state when squeue no
+            # longer sees the job.
             cmd = cmd + 'squeue -j ' + slurm_job + ' -h -o "%i %j %T %V %S %e" > ' + job_log + ' || true;'
         else:
             # grep -v omits logging of such as slurmID.batch tasks

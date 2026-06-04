@@ -55,6 +55,33 @@ import json
 def is_verbose_debug():
     return bpy.app.debug_value == 256
 
+
+def paramiko_load_private_key(key_file, key_file_password):
+    """Load common private key types and report useful errors."""
+    import paramiko
+
+    password = key_file_password if key_file_password else None
+    key_classes = [
+        key_class
+        for key_class in (
+            getattr(paramiko, "RSAKey", None),
+            getattr(paramiko, "Ed25519Key", None),
+            getattr(paramiko, "ECDSAKey", None),
+            getattr(paramiko, "DSSKey", None),
+        )
+        if key_class is not None
+    ]
+    errors = []
+
+    for key_class in key_classes:
+        try:
+            return key_class.from_private_key_file(key_file, password=password)
+        except Exception as exc:
+            errors.append("%s: %s: %s" % (key_class.__name__, exc.__class__.__name__, exc))
+
+    raise Exception("Unable to load SSH private key '%s'. Tried: %s" % (key_file, "; ".join(errors)))
+
+
 def get_ssh_key_file():
     ssh_key_local = Path(tempfile.gettempdir()) / 'server_key'
     return ssh_key_local
@@ -602,8 +629,7 @@ class RaasSession:
     def check_password(self):
         if self.use_password:
             return not self.password is None and len(self.password) > 0
-        else:
-            return not self.key_file_password is None and len(self.key_file_password) > 0
+        return not self.key_file is None and len(self.key_file) > 0
 
     def paramiko_create_session(self, password, password_2fa=None):
         import paramiko
@@ -682,21 +708,15 @@ class RaasSession:
                     allow_agent=False         # don’t use ssh-agent
                 )                
             else:                
-                from io import StringIO
-                try:
+                key = paramiko_load_private_key(self.key_file, self.key_file_password)
 
-                    if self.key_file_password is None or len(self.key_file_password) == 0:
-                        key = paramiko.RSAKey.from_private_key_file(self.key_file)
-                    else:
-                        key = paramiko.RSAKey.from_private_key_file(self.key_file, self.key_file_password)
-
-                except Exception as e:
-                    if self.key_file_password is None or len(self.key_file_password) == 0:
-                        key = paramiko.Ed25519Key.from_private_key_file(self.key_file)
-                    else:
-                        key = paramiko.Ed25519Key.from_private_key_file(self.key_file, self.key_file_password)                
-
-                ssh.connect(self.server, username=self.username, pkey=key)
+                ssh.connect(
+                    self.server,
+                    username=self.username,
+                    pkey=key,
+                    look_for_keys=False,
+                    allow_agent=False,
+                )
 
             ssh.get_transport().set_keepalive(30)  # send keepalive every 30s
 
@@ -826,6 +846,16 @@ class RaasSession:
             self.use_password = use_password
             self.ssh_client_type = client_type
 
+            if not self.use_password:
+                if self.key_file is None or len(self.key_file) == 0:
+                    raise Exception("SSH key authentication selected, but private key path is empty.")
+
+                resolved_key_file = bpy.path.abspath(self.key_file)
+                if not os.path.exists(resolved_key_file):
+                    raise Exception("SSH private key file does not exist: %s" % resolved_key_file)
+
+                self.key_file = resolved_key_file
+
             if self.check_password() and not use_password_2fa:
                 if client_type == 'PARAMIKO':
                     self.paramiko_create_session(None, None)
@@ -918,12 +948,15 @@ async def _ssh_async(key_file, server, username, command):
     if key_file is None:
         cmd = [
             'ssh',
+            '-o', 'BatchMode=yes',
             user_server, command
         ]
     else:
         cmd = [
             'ssh',
             '-i',  key_file,
+            '-o', 'BatchMode=yes',
+            '-o', 'PasswordAuthentication=no',
             user_server, command
         ]
 
@@ -959,6 +992,7 @@ async def _ssh_async_jump(key_file, server1, server2, username, command):
     if key_file is None:
         cmd = [
             'ssh',
+            '-o', 'BatchMode=yes',
             '-o', 'StrictHostKeyChecking=no',
             '-o', 'UserKnownHostsFile=/dev/null',
             '-J', user_server1,  # ProxyJump through server1
@@ -969,6 +1003,8 @@ async def _ssh_async_jump(key_file, server1, server2, username, command):
         cmd = [
             'ssh',
             '-i', key_file,
+            '-o', 'BatchMode=yes',
+            '-o', 'PasswordAuthentication=no',
             '-o', 'StrictHostKeyChecking=no',
             '-o', 'UserKnownHostsFile=/dev/null',
             '-J', user_server1,  # ProxyJump through server1
@@ -1006,6 +1042,7 @@ def _ssh_sync(key_file, server, username, command):
     if key_file is None:
         cmd = [
             'ssh',
+            '-o', 'BatchMode=yes',
             '-o', 'StrictHostKeyChecking=no',
             '-o', 'UserKnownHostsFile=/dev/null',
             user_server, command
@@ -1014,6 +1051,8 @@ def _ssh_sync(key_file, server, username, command):
         cmd = [
             'ssh',
             '-i',  key_file,
+            '-o', 'BatchMode=yes',
+            '-o', 'PasswordAuthentication=no',
             '-o', 'StrictHostKeyChecking=no',
             '-o', 'UserKnownHostsFile=/dev/null',
             user_server, command
@@ -1226,18 +1265,16 @@ def _paramiko_ssh_jump(server1, server2, username, key_file, key_file_password, 
             if use_password:
                 ssh_target.connect(server2, username=username, password=password, sock=jump_channel)
             else:
-                try:
-                    if key_file_password is None or len(key_file_password) == 0:
-                        key = paramiko.RSAKey.from_private_key_file(key_file)
-                    else:
-                        key = paramiko.RSAKey.from_private_key_file(key_file, key_file_password)
-                except Exception as e:
-                    if key_file_password is None or len(key_file_password) == 0:
-                        key = paramiko.Ed25519Key.from_private_key_file(key_file)
-                    else:
-                        key = paramiko.Ed25519Key.from_private_key_file(key_file, key_file_password)
+                key = paramiko_load_private_key(key_file, key_file_password)
                 
-                ssh_target.connect(server2, username=username, pkey=key, sock=jump_channel)
+                ssh_target.connect(
+                    server2,
+                    username=username,
+                    pkey=key,
+                    sock=jump_channel,
+                    look_for_keys=False,
+                    allow_agent=False,
+                )
             
             # Execute the command on server2
             stdin, stdout, stderr = ssh_target.exec_command(command)
@@ -1275,7 +1312,7 @@ async def ssh_command(server, command, preset):
     elif preset.raas_ssh_library == 'PARAMIKO':
         return _paramiko_ssh(server, username, key_file, key_file_password, password, use_password, use_password_2fa, command)
     else:
-        return await _ssh_async(None, server, None, command)
+        return await _ssh_async(key_file if not use_password else None, server, username, command)
 
 def ssh_command_sync(server, command, preset):
     if command  is None:
@@ -1294,7 +1331,7 @@ def ssh_command_sync(server, command, preset):
     elif preset.raas_ssh_library == 'PARAMIKO':
         return _paramiko_ssh(server, username, key_file, key_file_password, password, use_password, use_password_2fa, command)
     else:
-        return _ssh_sync(None, server, None, command)
+        return _ssh_sync(key_file if not use_password else None, server, username, command)
     
 
 async def ssh_command_jump(server1, server2, command, preset):
@@ -1314,7 +1351,7 @@ async def ssh_command_jump(server1, server2, command, preset):
     elif preset.raas_ssh_library == 'PARAMIKO':
         return _paramiko_ssh_jump(server1, server2, username, key_file, key_file_password, password, use_password, use_password_2fa, command)
     else:
-        return await _ssh_async_jump(None, server1, server2, None, command)
+        return await _ssh_async_jump(key_file if not use_password else None, server1, server2, username, command)
 
 def ssh_command_sync_jump(server1, server2, command, preset):
     if command  is None:
@@ -1333,7 +1370,7 @@ def ssh_command_sync_jump(server1, server2, command, preset):
     elif preset.raas_ssh_library == 'PARAMIKO':
         return _paramiko_ssh_jump(server1, server2, username, key_file, key_file_password, password, use_password, use_password_2fa, command)
     else:
-        return _ssh_async_jump(None, server1, server2, None, command)
+        return _ssh_async_jump(key_file if not use_password else None, server1, server2, username, command)
                   
 ####################################FileTransfer#############################
 
@@ -1354,6 +1391,7 @@ async def _scp_async(key_file, source, destination):
                 'scp',
                 '-i',  key_file,
                 '-o', 'StrictHostKeyChecking=no',
+                '-o', 'PasswordAuthentication=no',
                 '-q',
                 '-B',
                 '-r',
@@ -1582,16 +1620,17 @@ async def transfer_files(context, fileTransfer, job_local_dir: str, job_remote_d
             await asyncio.to_thread(_paramiko_get, serverHostname, username, key_file, key_file_password, password, use_password, use_password_2fa, source, destination)
 
     else:       
+        user_server = '%s@%s' % (username, serverHostname) if username else serverHostname
         if to_cluster == True:
             source = job_local_dir
-            destination = '%s:%s/%s' % (serverHostname, str(sharedBasepath), job_remote_dir)
+            destination = '%s:%s/%s' % (user_server, str(sharedBasepath), job_remote_dir)
             print('copy from %s to server' % (job_local_dir))
         else:
             destination = job_local_dir
-            source = '%s:%s/%s' % (serverHostname, str(sharedBasepath), job_remote_dir)
+            source = '%s:%s/%s' % (user_server, str(sharedBasepath), job_remote_dir)
             print('copy from server to: %s' % (job_local_dir))
 
-        await _scp_async(None, source, destination)
+        await _scp_async(key_file if not use_password else None, source, destination)
             
 
 async def transfer_files_to_cluster(context, fileTransfer, job_local_dir: str, job_remote_dir: str, job_id: int, token: str) -> None:

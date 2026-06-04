@@ -55,11 +55,11 @@ def factor(factor: float) -> dict:
         return {'percentage': factor}
     return {'factor': factor}
 
+
 ##################################################
 
 
 def show_message_box(message="", title="BRaaS-HPC", icon='INFO'):
-
     def draw(self, context):
         self.layout.label(text=message)
 
@@ -73,7 +73,6 @@ python_dependencies = (Dependency(module="paramiko", package="paramiko", name=No
                        Dependency(module="scp", package="scp", name=None),
                        Dependency(module="asyncssh", package="asyncssh", name=None),
                        )
-                    #               package="blender_asset_tracer", name=None),
 
 
 internal_dependencies = []
@@ -103,7 +102,7 @@ def install_pip():
 
         # Upgrade
         subprocess.run([python_exe, "-m", "pip", "install",
-                       "--upgrade", "pip"], check=True)
+                        "--upgrade", "pip"], check=True)
 
     except subprocess.CalledProcessError:
         import ensurepip
@@ -129,117 +128,13 @@ def install_and_import_module(module_name, package_name=None, global_name=None):
         python_exe = sys.executable
 
     subprocess.run([python_exe, "-m", "pip", "install",
-                   package_name], check=True, env=environ_copy)
+                    package_name], check=True, env=environ_copy)
 
     # The installation succeeded, attempt to import the module again
     import_module(module_name, global_name)
 
+
 ################################################################
-
-
-def _paramiko_generate_ssh_key(private_filepath, public_filepath, password):
-
-    import paramiko
-    key = paramiko.RSAKey.generate(2048)
-    key.write_private_key_file(private_filepath, password)
-
-    public_key = "%s %s" % (key.get_name(), key.get_base64())
-    with open(public_filepath, "w") as f:
-        f.write(public_key)
-
-    f.close()
-
-
-class RAAS_OT_generate_sshkey(Operator):
-    bl_idname = 'raas.generate_sshkey'
-    bl_label = 'Generate a public/private key pair'
-    bl_description = ("Generate SSH Key")
-
-    def execute(self, context):
-        try:
-            if not preferences().check_valid_settings_gen(type='GENERATE'):
-                return {"CANCELLED"}
-
-            if len(preferences().raas_gen_public_key_path) == 0:
-                preferences().raas_gen_public_key_path = preferences(
-                ).raas_job_storage_path + '/raas_gen.public.key'
-
-            if len(preferences().raas_gen_private_key_path) == 0:
-                preferences().raas_gen_private_key_path = preferences(
-                ).raas_job_storage_path + '/raas_gen.private.key'
-
-            _paramiko_generate_ssh_key(preferences().raas_gen_private_key_path, preferences(
-            ).raas_gen_public_key_path, preferences().raas_gen_password)
-
-        except Exception as e:
-            import traceback
-            traceback.print_exc()
-
-            self.report({'ERROR'}, "Problem with %s: %s: %s" %
-                        (self.bl_label, e.__class__, e))
-            return {"CANCELLED"}
-
-        self.report({'INFO'}, "'%s' finished" % (self.bl_label))
-        return {"FINISHED"}
-
-
-class RAAS_OT_upload_sshkey(Operator):
-    bl_idname = 'raas.upload_sshkey'
-    bl_label = 'Upload public key'
-    bl_description = ("Upload SSH Key")
-
-    def execute(self, context):
-        try:
-            if not preferences().check_valid_settings_gen():
-                return {"CANCELLED"}
-
-            if len(preferences().raas_gen_public_key_path) > 0:
-                with open(preferences().raas_gen_public_key_path) as f:
-                    public_key = f.readlines()
-
-                bpy.context.window_manager.clipboard = public_key[0]
-
-            import webbrowser
-            if preferences().raas_account_type == "EDUID":
-                webbrowser.open(
-                    'https://signup.e-infra.cz/fed/registrar/?vo=IT4Innovations', new=2)
-            else:
-                webbrowser.open('https://extranet.it4i.cz/ssp/?action=changesshkey&login=%s' %
-                                preferences().raas_gen_username, new=2)
-
-        except Exception as e:
-            import traceback
-            traceback.print_exc()
-
-            self.report({'ERROR'}, "Problem with %s: %s: %s" %
-                        (self.bl_label, e.__class__, e))
-            return {"CANCELLED"}
-
-        self.report({'INFO'}, "'%s' finished" % (self.bl_label))
-        return {"FINISHED"}
-
-
-
-
-
-
-#             # TODO
-
-
-#             traceback.print_exc()
-
-
-
-
-
-
-
-
-
-#                 traceback.print_exc()
-
-#                 # return {"CANCELLED"}
-
 
 
 class RAAS_OT_install_scripts(Operator):
@@ -256,29 +151,30 @@ class RAAS_OT_install_scripts(Operator):
                         # TODO: MJ
                         if not preferences().check_valid_settings(p, type='INSTALL_SCRIPTS'):
                             return {"CANCELLED"}
-                                        
+
                         # Install scripts
                         self.report({'INFO'}, "Install scripts on '%s'" % (cl[0]))
-                        cmd = context.scene.raas_config_functions.call_get_git_addon_command(preferences().raas_scripts_repository, preferences().raas_scripts_repository_branch)
+                        cmd = context.scene.raas_config_functions.call_get_git_addon_command(
+                            preferences().raas_scripts_repository, preferences().raas_scripts_repository_branch)
                         if len(cmd) > 0:
                             server = context.scene.raas_config_functions.call_get_server_from_type(cl[0])
                             raas_connection.ssh_command_sync(server, cmd, p)
-
 
                         # Install Blender
                         self.report({'INFO'}, "Install Blender on '%s'" % (cl[0]))
-                        cmd = context.scene.raas_config_functions.call_get_blender_install_command(p, preferences().raas_blender_link)
+                        cmd = context.scene.raas_config_functions.call_get_blender_install_command(p,
+                                                                                                   preferences().raas_blender_link)
                         if len(cmd) > 0:
                             server = context.scene.raas_config_functions.call_get_server_from_type(cl[0])
                             raas_connection.ssh_command_sync(server, cmd, p)
 
-
                         # Apply patches
                         self.report({'INFO'}, "Apply patches on '%s'" % (cl[0]))
-                        cmd = context.scene.raas_config_functions.call_get_blender_patch_command(p, preferences().raas_blender_link)
+                        cmd = context.scene.raas_config_functions.call_get_blender_patch_command(p,
+                                                                                                 preferences().raas_blender_link)
                         if len(cmd) > 0:
                             server = context.scene.raas_config_functions.call_get_server_from_type(cl[0])
-                            raas_connection.ssh_command_sync(server, cmd, p)                            
+                            raas_connection.ssh_command_sync(server, cmd, p)
 
                         preferences().raas_scripts_installed = True
 
@@ -295,18 +191,15 @@ class RAAS_OT_install_scripts(Operator):
 
         self.report({'INFO'}, "'%s' finished" % (self.bl_label))
         return {"FINISHED"}
-    
+
 
 #                 #     return {"CANCELLED"}
 
 #                     #if (cl[0], True) in presets_tuples:
 #                         # TODO: MJ
-                                                                 
-
 
 
 #                 traceback.print_exc()
-
 
 
 ##################################################################
@@ -372,6 +265,8 @@ class RAAS_OT_update_dependencies(Operator):
 
         self.report({'INFO'}, "'%s' finished" % (self.bl_label))
         return {"FINISHED"}
+
+
 ##################################################
 
 class RAAS_OT_NewClusterPreset(bpy.types.Operator):
@@ -382,30 +277,30 @@ class RAAS_OT_NewClusterPreset(bpy.types.Operator):
     def draw(self, context):
         layout = self.layout
 
-
     def execute(self, context):
         addonprefs = preferences()
         addonprefs.cluster_presets.add()  # New preset
 
         return {'FINISHED'}
-    
+
+
 class RAAS_OT_RemoveClusterPreset(bpy.types.Operator):
     """Removes a cluster preset"""
     bl_idname = "pref.removecluster"
     bl_label = ""
-    
+
     index: bpy.props.IntProperty()
 
     def draw(self, context):
         layout = self.layout
-
 
     def execute(self, context):
         addonprefs = preferences()
         addonprefs.cluster_presets.remove(self.index)  # Remove this preset
 
         return {'FINISHED'}
-    
+
+
 def cluster_partition_settings_callback(self, context):
     """Returns a list partitions dynamically based on the cluster selected.
 
@@ -417,8 +312,8 @@ def cluster_partition_settings_callback(self, context):
         return []
     else:
         return getattr(raas_config, "%s_partitions" % self.cluster_name.capitalize())
-    
-    
+
+
 class ClusterPresets(bpy.types.PropertyGroup):
     """
         A property group of cluster presets. Each presets has the following properties:
@@ -429,75 +324,76 @@ class ClusterPresets(bpy.types.PropertyGroup):
         name="Cluster",
         description="Select a cluster",
         items=raas_config.Cluster_items
-    ) # type: ignore
+    )  # type: ignore
 
     partition_name: bpy.props.EnumProperty(
         name="Partition/Queue",
         description="Select a partition/queue",
         items=cluster_partition_settings_callback
-    ) # type: ignore
+    )  # type: ignore
 
     allocation_name: bpy.props.StringProperty(
         name="Project",
         description="Project allocation name",
-        default=""
-    ) # type: ignore
+        default="local"
+    )  # type: ignore
 
-    job_type : bpy.props.EnumProperty(
+    job_type: bpy.props.EnumProperty(
         items=raas_config.JobQueue_items,
         name="Type of Job (resources)"
-    ) # type: ignore
+    )  # type: ignore
 
     is_enabled: bpy.props.BoolProperty(
         name="Enabled",
         description="This settings is active",
         default=True
-    ) # type: ignore
-    
+    )  # type: ignore
+
     working_dir: StringProperty(
         name='Project Dir',
-        description='The PROJECT data storage is a central storage for projects/users data on IT4Innovations, e.g. /mnt/projX/OPEN-XX-XX, /mnt/projX/DD-XX-XX',
+        description='The PROJECT data storage is a central storage for projects/users data',
         default=''
-    ) # type: ignore
+    )  # type: ignore
 
     raas_da_username: StringProperty(
         name='Username',
         default=''
-    ) # type: ignore
+    )  # type: ignore
 
     raas_da_password: StringProperty(
         name='Password',
         default='',
         subtype='PASSWORD'
-    ) # type: ignore
+    )  # type: ignore
 
     raas_da_use_password: bpy.props.BoolProperty(
         name="Use Password",
         default=False
-    ) # type: ignore
+    )  # type: ignore
 
     raas_private_key_path: StringProperty(
         name='Private Key Path',
         description='Private Key Path',
         subtype='FILE_PATH',
         default=''
-    ) # type: ignore 
+    )  # type: ignore
 
     raas_private_key_password: StringProperty(
         name='Key Passphrase',
         default='',
         subtype='PASSWORD'
-    ) # type: ignore
+    )  # type: ignore
 
     raas_use_2FA: bpy.props.BoolProperty(
         name="Use 2FA",
         default=False
-    ) # type: ignore    
+    )  # type: ignore
 
     raas_ssh_library: EnumProperty(
         name='SSH Library',
         items=raas_config.ssh_library_items
-    ) # type: ignore    
+    )  # type: ignore
+
 
 class RAAS_OT_find_working_dir(Operator):
     """
@@ -508,7 +404,7 @@ class RAAS_OT_find_working_dir(Operator):
     bl_description = ("Find")
 
     def execute(self, context):
-        try:            
+        try:
             # Get the cluster presets
             addonprefs = preferences()
             for preset in addonprefs.cluster_presets:
@@ -524,7 +420,8 @@ class RAAS_OT_find_working_dir(Operator):
                     log.info(message)
                     self.report({'INFO'}, message)
                 elif preset.working_dir:
-                    message = "Find working dir for %s skipped: already set to %s" % (preset.cluster_name, preset.working_dir)
+                    message = "Find working dir for %s skipped: already set to %s" % (preset.cluster_name,
+                                                                                      preset.working_dir)
                     log.info(message)
                     self.report({'INFO'}, message)
                 else:
@@ -545,7 +442,8 @@ class RAAS_OT_find_working_dir(Operator):
         log.info("'%s' finished", self.bl_label)
         self.report({'INFO'}, "'%s' finished" % (self.bl_label))
         return {"FINISHED"}
-    
+
+
 class RAAS_OT_test_connection(Operator):
     """
         Goes through all cluster presets and for each tests the connection.
@@ -555,11 +453,10 @@ class RAAS_OT_test_connection(Operator):
     bl_description = ("Test")
 
     def execute(self, context):
-        try:            
+        try:
             # Get the cluster presets
             addonprefs = preferences()
             for preset in addonprefs.cluster_presets:
-
 
                 # Test connection
                 if preset.is_enabled:
@@ -584,9 +481,9 @@ class RAAS_OT_test_connection(Operator):
 
         log.info("'%s' finished", self.bl_label)
         self.report({'INFO'}, "'%s' finished" % (self.bl_label))
-        return {"FINISHED"}    
-            
-    
+        return {"FINISHED"}
+
+
 class RaasPreferences(AddonPreferences):
     bl_idname = ADDON_NAME
 
@@ -594,17 +491,17 @@ class RaasPreferences(AddonPreferences):
         name='Error Message',
         default='',
         options={'HIDDEN', 'SKIP_SAVE'}
-    ) # type: ignore
+    )  # type: ignore
 
     ok_message: StringProperty(
         name='Message',
         default='',
         options={'HIDDEN', 'SKIP_SAVE'}
-    ) # type: ignore
+    )  # type: ignore
 
     show_ssh_gen: BoolProperty(
         default=False
-    ) # type: ignore
+    )  # type: ignore
 
     #     name='RaaS Server',
     #     default=''
@@ -613,41 +510,41 @@ class RaasPreferences(AddonPreferences):
         name='Username',
         description='Username to access the server',
         default=''
-    ) # type: ignore
+    )  # type: ignore
 
     raas_password: StringProperty(
         name='Password',
         description='Password to access the server',
         default='',
         subtype='PASSWORD'
-    ) # type: ignore
+    )  # type: ignore
 
     ## Adding new clusters
     cluster_presets: bpy.props.CollectionProperty(type=ClusterPresets)
 
     raas_working_dir: StringProperty(
         name='Project Dir',
-        description='The PROJECT data storage is a central storage for projects/users data on IT4Innovations, e.g. /mnt/projX/OPEN-XX-XX, /mnt/projX/DD-XX-XX',
+        description='The PROJECT data storage is a central storage for projects/users data',
         default=''
-    ) # type: ignore
+    )  # type: ignore
 
     raas_pid_name: StringProperty(
         name='Project ID',
         description='Computing resource allocated by the project allocation committee to the primary investigator, e.g. OPEN-XX-XX, DD-XX-XX',
         default=''
-    ) # type: ignore
+    )  # type: ignore
 
     raas_pid_queue: StringProperty(
         name='Project Queue',
         description='The queue for running the job on the cluster, e.g. qcpu, qgpu',
         default='qcpu'
-    ) # type: ignore
+    )  # type: ignore
 
     raas_pid_dir: StringProperty(
         name='Project Dir',
-        description='The PROJECT data storage is a central storage for projects/users data on IT4Innovations, e.g. /mnt/projX/OPEN-XX-XX, /mnt/projX/DD-XX-XX',
+        description='The PROJECT data storage is a central storage for projects/users data',
         default=''
-    ) # type: ignore
+    )  # type: ignore
 
     #############################################################
 
@@ -656,11 +553,11 @@ class RaasPreferences(AddonPreferences):
         description='Path where to store job files',
         subtype='DIR_PATH',
         default=tempfile.gettempdir()
-    ) # type: ignore
+    )  # type: ignore
 
     dependencies_installed: BoolProperty(
         default=False
-    ) # type: ignore
+    )  # type: ignore
 
     #     name='Use Paramiko',
     #     default=True
@@ -670,12 +567,12 @@ class RaasPreferences(AddonPreferences):
     raas_account_type: EnumProperty(
         name='Account Type',
         items=raas_config.account_types_items
-    ) # type: ignore
+    )  # type: ignore
 
     raas_project_group: StringProperty(
         name='Working Group',
         default=''
-    ) # type: ignore
+    )  # type: ignore
 
     #     name='Username',
     #     default=''
@@ -694,33 +591,33 @@ class RaasPreferences(AddonPreferences):
         description='Gen. Private Key Path',
         subtype='FILE_PATH',
         default=''
-    ) # type: ignore
+    )  # type: ignore
 
     raas_gen_public_key_path: StringProperty(
         name='Gen. Public Key Path',
         description='Gen. Public Key Path',
         subtype='FILE_PATH',
         default=''
-    ) # type: ignore
+    )  # type: ignore
 
     raas_scripts_repository: StringProperty(
         name='Repository',
         default='https://github.com/It4innovations/braas-hpc.git'
-    ) # type: ignore
+    )  # type: ignore
 
     raas_scripts_repository_branch: StringProperty(
         name='Branch',
         default='main'
-    ) # type: ignore
+    )  # type: ignore
 
     raas_blender_link: StringProperty(
         name='Link',
         default='https://mirrors.dotsrc.org/blender/release/Blender5.1/blender-5.1.2-linux-x64.tar.xz'
-    ) # type: ignore
+    )  # type: ignore
 
     raas_scripts_installed: BoolProperty(
         default=False
-    ) # type: ignore
+    )  # type: ignore
 
     #     default=False
 
@@ -730,13 +627,13 @@ class RaasPreferences(AddonPreferences):
     raas_gen_username: StringProperty(
         name='Username',
         default=''
-    ) # type: ignore
+    )  # type: ignore
 
     raas_gen_password: StringProperty(
         name='Key Passphrase',
         default='',
         subtype='PASSWORD'
-    ) # type: ignore
+    )  # type: ignore
 
     def check_valid_settings(self, cl, type='NONE'):
         if cl.raas_ssh_library == 'ASYNCSSH' or cl.raas_ssh_library == 'PARAMIKO':
@@ -745,7 +642,7 @@ class RaasPreferences(AddonPreferences):
                     message='Username is not set in preferences', icon='ERROR')
                 return False
 
-            if  not cl.raas_da_use_password and len(cl.raas_private_key_path) == 0:
+            if not cl.raas_da_use_password and len(cl.raas_private_key_path) == 0:
                 show_message_box(
                     message='Private Key File is not set in preferences', icon='ERROR')
                 return False
@@ -754,13 +651,13 @@ class RaasPreferences(AddonPreferences):
             show_message_box(
                 message='Scripts are not installed', icon='ERROR')
             return False
-        
+
         if len(self.raas_scripts_repository) == 0 or len(self.raas_scripts_repository_branch) == 0:
             show_message_box(
                 message='Git repository is not set in preferences', icon='ERROR')
-            return False        
-        
-        #     show_message_box(
+            return False
+
+            #     show_message_box(
         #         message='Blender is not installed', icon='ERROR')
 
         if len(self.raas_blender_link) == 0:
@@ -818,23 +715,16 @@ class RaasPreferences(AddonPreferences):
     def draw(self, context):
         layout = self.layout
 
-
-
-            
-
-
-
-        
         box = layout.box()
 
         raas_pid = box.split(**factor(1.0), align=True)
-        pid_box = raas_pid.row(align=True)    
+        pid_box = raas_pid.row(align=True)
         pid_box.label(text='Cluster settings:')
 
         raas_pid = box.split(**factor(1.0), align=True)
         pid_box = raas_pid.row(align=True)
         pid_box.operator("pref.newcluster", icon="ADD")
-        
+
         for idx, preset in enumerate(self.cluster_presets):
             if preset.working_dir == '' or (preset.allocation_name == '' and preset.cluster_name != "SCEBE"):
                 preset.is_enabled = False
@@ -861,7 +751,6 @@ class RaasPreferences(AddonPreferences):
             rep_box = rep_box1.row(align=True)
             rep_box.prop(preset, 'raas_use_2FA', text='')
 
-            
             if preset.raas_da_use_password:
                 pid_box.prop(preset, "raas_da_password")
             else:
@@ -870,7 +759,7 @@ class RaasPreferences(AddonPreferences):
 
             raas_pid = box_row.split(**factor(1.0), align=True)
             pid_box = raas_pid.column(align=True)
-            pid_box.prop(preset, "raas_ssh_library")                
+            pid_box.prop(preset, "raas_ssh_library")
 
             raas_pid = box_row.split(**factor(1.0), align=True)
             pid_box = raas_pid.column(align=True)
@@ -878,7 +767,6 @@ class RaasPreferences(AddonPreferences):
             pid_box.prop(preset, "working_dir", text='Dir')
             pid_box.prop(preset, "is_enabled")
             pid_box.operator("pref.removecluster", icon="CANCEL").index = idx
-
 
         if len(self.cluster_presets) > 0:
             raas_pid = box.split(**factor(1.0), align=True)
@@ -916,8 +804,6 @@ class RaasPreferences(AddonPreferences):
             boxD.operator(RAAS_OT_update_dependencies.bl_idname,
                           icon="CONSOLE")
 
-
-
         box = layout.box()
 
         boxG = box.box()
@@ -929,7 +815,7 @@ class RaasPreferences(AddonPreferences):
         rep_box.prop(self, 'raas_scripts_repository', text='')
         rep_box = rep_box1.row(align=True)
         rep_box.prop(self, 'raas_scripts_repository_branch', text='')
-            
+
         rep_split = boxG.split(**factor(0.25), align=True)
         rep_split.label(text='Link (Blender):')
         rep_box1 = rep_split.row(align=True)
@@ -942,37 +828,23 @@ class RaasPreferences(AddonPreferences):
         rep_box = rep_box1.row(align=True)
         rep_box.prop(self, 'raas_scripts_installed', text='')
 
-
         #                     icon="CONSOLE", text="Install scripts on the cluster")
         #                     icon="CONSOLE", text="Update scripts")
-
-
 
         #                     icon="CONSOLE", text="Install Blender on the cluster")
         #                     icon="CONSOLE", text="Update Blender")
 
-        if self.raas_scripts_installed == False: # or self.raas_blender_installed == False:
+        if self.raas_scripts_installed == False:  # or self.raas_blender_installed == False:
             if not self.raas_scripts_installed:
                 boxG.label(text='Scripts are not installed', icon='ERROR')
 
-
             boxG.operator(RAAS_OT_install_scripts.bl_idname,
-                            icon="CONSOLE", text="Install scripts and Blender on the cluster(s)")
+                          icon="CONSOLE", text="Install scripts and Blender on the cluster(s)")
         else:
             boxG.operator(RAAS_OT_install_scripts.bl_idname,
-                            icon="CONSOLE", text="Update scripts and Blender on the cluster(s)")
-
-
-
-
-
-
-
-
+                          icon="CONSOLE", text="Update scripts and Blender on the cluster(s)")
 
         #                     icon="CONSOLE")
-
-
 
         #     #     text='Please wait a minute for the public key to install on all clusters before running Setup.')
 
@@ -1035,8 +907,6 @@ def register():
     bpy.utils.register_class(RaasAuthValidate)
     bpy.utils.register_class(RAAS_OT_install_dependencies)
     bpy.utils.register_class(RAAS_OT_update_dependencies)
-    bpy.utils.register_class(RAAS_OT_generate_sshkey)
-    bpy.utils.register_class(RAAS_OT_upload_sshkey)
     bpy.utils.register_class(RAAS_OT_NewClusterPreset)
     bpy.utils.register_class(RAAS_OT_RemoveClusterPreset)
     bpy.utils.register_class(RAAS_OT_find_working_dir)
@@ -1047,9 +917,6 @@ def register():
         for dependency in python_dependencies:
             import_module(module_name=dependency.module,
                           global_name=dependency.name)
-
-        # check_internal_addons()
-        # check_external_addons()
 
         preferences().dependencies_installed = True
     except ModuleNotFoundError:
@@ -1066,8 +933,6 @@ def unregister():
     bpy.utils.unregister_class(RaasPreferences)
     bpy.utils.unregister_class(RAAS_OT_install_dependencies)
     bpy.utils.unregister_class(RAAS_OT_update_dependencies)
-    bpy.utils.unregister_class(RAAS_OT_generate_sshkey)
-    bpy.utils.unregister_class(RAAS_OT_upload_sshkey)
     bpy.utils.unregister_class(RAAS_OT_NewClusterPreset)
     bpy.utils.unregister_class(RAAS_OT_RemoveClusterPreset)
     bpy.utils.unregister_class(RAAS_OT_find_working_dir)

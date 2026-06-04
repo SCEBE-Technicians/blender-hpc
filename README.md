@@ -2,7 +2,7 @@
 
 A Blender add-on for submitting Cycles render jobs to Edinburgh Napier University HPC resources, including ENUCC and the SCEBE GPU server.
 
-This project is a fork of the original [BRaaS-HPC](https://github.com/It4innovations/braas-hpc) project from IT4Innovations. The fork adapts the add-on for direct SSH-based rendering workflows on Edinburgh Napier University infrastructure, with current bundled Slurm scripts for `scebe-gpu-server`.
+This project is a fork of the original [BRaaS-HPC](https://github.com/It4innovations/braas-hpc) project from IT4Innovations. The fork adapts the add-on for direct SSH-based rendering workflows on Edinburgh Napier University infrastructure, with bundled Slurm scripts for ENUCC and `scebe-gpu-server`.
 
 ## What It Does
 
@@ -15,12 +15,13 @@ It is intended for artists, researchers, and technical users who want to render 
 | Target | Scheduler | Status |
 | --- | --- | --- |
 | SCEBE GPU Server | Slurm | Supported by bundled scripts |
-| ENUCC | HPC/Slurm-style target | Intended target for this fork |
+| ENUCC | Slurm | Supported by bundled scripts |
 
 Current bundled scripts are in:
 
 ```text
 scripts/scebe-gpu-server-slurm/
+scripts/enucc-slurm/
 ```
 
 The current SCEBE server configuration uses:
@@ -31,6 +32,16 @@ Address: 146.176.131.129
 Partition: LocalQ
 Scheduler: Slurm
 ```
+
+The current ENUCC configuration uses:
+
+```text
+Host: login.enucc.napier.ac.uk
+Partitions: short, long, himem, gpu
+Scheduler: Slurm
+```
+
+The ENUCC `nodes` partition is intentionally not exposed by the add-on.
 
 ## Key Features
 
@@ -119,15 +130,15 @@ In the add-on preferences:
 In `Edit > Preferences > Add-ons > BRaaS-HPC`:
 
 1. Add a cluster preset.
-2. Select the cluster, for example `SCEBE GPU Server`.
-3. Set the partition, for example `LocalQ`.
-4. Select job type, usually `GPU` for SCEBE rendering.
+2. Select the cluster, for example `SCEBE GPU Server` or `ENUCC`.
+3. Set the partition, for example `LocalQ` on SCEBE or `gpu`/`short`/`long`/`himem` on ENUCC.
+4. Select job type, usually `GPU` for GPU rendering.
 5. Enter your remote username.
 6. Configure SSH authentication.
 7. Set or discover the working directory.
 8. Enable the preset.
 
-For SCEBE, allocation/account can normally be left blank if the local Slurm configuration does not require `--account`.
+For SCEBE and ENUCC, allocation/account can normally be left blank if the local Slurm configuration does not require `--account`.
 
 ### 5. Install Scripts And Blender On The Server
 
@@ -138,10 +149,11 @@ In the add-on preferences:
 3. Click `Install scripts and Blender on the cluster(s)`.
 4. Alternatively, install manually and enable `Scripts already installed`.
 
-Expected remote paths for SCEBE:
+Expected remote script paths:
 
 ```text
 ~/braas-hpc/scripts/scebe-gpu-server-slurm/
+~/braas-hpc/scripts/enucc-slurm/
 ~/blender/blender
 ```
 
@@ -167,7 +179,7 @@ In `New Job`:
 
 For a single image, the current frame is rendered.
 
-For an animation, frames are submitted through a Slurm array. Each array task renders part of the frame range. For SCEBE GPU jobs, each task requests one GPU.
+For an animation, frames are submitted through a Slurm array. Each array task renders part of the frame range. GPU jobs request one GPU with `--gres=gpu:1`.
 
 ### 3. Submit The Job
 
@@ -212,9 +224,9 @@ job/   job metadata
 
 Files are stored under the local job storage directory configured in add-on preferences.
 
-## SCEBE Render Scripts
+## Render Scripts
 
-The SCEBE script set contains:
+Each Slurm script set contains:
 
 ```text
 job_init.sh
@@ -225,6 +237,14 @@ use_gpu.py
 ```
 
 `run_blender_gpu.sh` runs Blender in background mode with Cycles and executes `use_gpu.py` to select GPU rendering.
+
+The ENUCC script set is located at:
+
+```text
+scripts/enucc-slurm/
+```
+
+ENUCC submissions include `--time=<hh:mm:ss>` in the generated `sbatch` command.
 
 Animation jobs render frames as individual frame outputs. The add-on does not stitch frames into a video. If you need a video file, render frames first and assemble them afterward using Blender, FFmpeg, or another tool.
 
@@ -261,11 +281,11 @@ The selected preset is disabled. In add-on preferences, check:
 
 ### Job Stays Pending With `InvalidAccount`
 
-On SCEBE, do not submit with a Slurm account unless the server administrator has configured one for your user. The SCEBE path in this fork omits `--account`.
+On SCEBE and ENUCC, do not submit with a Slurm account unless the server administrator has configured one for your user. These paths in this fork omit `--account`.
 
 ### Slurm Accounting Is Disabled
 
-If `sacct` fails, this is expected on SCEBE. The add-on uses `squeue` and `.job` files instead.
+If `sacct` fails, this is expected on direct Slurm targets where accounting is unavailable. The add-on uses `squeue` and `.job` files instead.
 
 ### No Jobs Appear In The Job List
 
@@ -275,6 +295,8 @@ Check the remote job files:
 ls -la ~/braas-hpc/direct/<username>/scebe/*.job
 cat ~/braas-hpc/direct/<username>/scebe/*.job
 ```
+
+For ENUCC, replace `scebe` with `enucc`.
 
 The add-on parses these `.job` files to populate the Blender job list.
 
@@ -292,6 +314,7 @@ Check the remote log files in the job `log/` directory. Also confirm:
 ```text
 addons/braas_hpc/                  Blender add-on source
 scripts/scebe-gpu-server-slurm/    SCEBE Slurm render scripts
+scripts/enucc-slurm/               ENUCC Slurm render scripts
 img/                               README/UI images from the original project
 doc/                               Additional documentation
 ```

@@ -18,20 +18,29 @@
 
 # (c) IT4Innovations, VSB-TUO
 
-"""SCEBE-only RaaS config."""
+"""ENUCC/SCEBE RaaS config."""
 
 import bpy
 
 Cluster_items_dict = {
     "SCEBE": "SCEBE GPU Server",
+    "ENUCC": "ENUCC",
 }
 
 Cluster_items = [
     ("SCEBE", "SCEBE GPU Server", ""),
+    ("ENUCC", "ENUCC", ""),
 ]
 
 Scebe_partitions = [
     ("LocalQ", "LocalQ", ""),
+]
+
+Enucc_partitions = [
+    ("short", "short", "1 day walltime limit"),
+    ("long", "long", "7 day walltime limit"),
+    ("himem", "himem", "High-memory nodes"),
+    ("gpu", "gpu", "GPU nodes"),
 ]
 
 JobQueue_items = [
@@ -67,28 +76,45 @@ async def CreateJob(context, token):
     blender_job_info_new = context.scene.raas_blender_job_info_new
     job_type = blender_job_info_new.job_type
 
-    if blender_job_info_new.cluster_type != 'SCEBE':
+    if blender_job_info_new.cluster_type not in {'SCEBE', 'ENUCC'}:
         raise ValueError("Unsupported cluster type: %s" % blender_job_info_new.cluster_type)
+
+    if blender_job_info_new.cluster_type == 'ENUCC':
+        cluster_id = 13
+        cpu_init = 130
+        cpu_render = 131
+        cpu_finish = 132
+        gpu_init = 133
+        gpu_render = 134
+        gpu_finish = 135
+    else:
+        cluster_id = 12
+        cpu_init = 120
+        cpu_render = 121
+        cpu_finish = 122
+        gpu_init = 123
+        gpu_render = 124
+        gpu_finish = 125
 
     if 'JOB_CPU' in job_type:
         await raas_jobs.CreateJobTask3Dep(
             context,
             token,
-            raas_jobs.JobTaskInfo(1, 121, 120),
-            raas_jobs.JobTaskInfo(1, 121, 121),
-            raas_jobs.JobTaskInfo(1, 121, 122),
+            raas_jobs.JobTaskInfo(1, cpu_render, cpu_init),
+            raas_jobs.JobTaskInfo(1, cpu_render, cpu_render),
+            raas_jobs.JobTaskInfo(1, cpu_render, cpu_finish),
             2,
-            12,
+            cluster_id,
         )
     elif 'JOB_GPU' in job_type:
         await raas_jobs.CreateJobTask3Dep(
             context,
             token,
-            raas_jobs.JobTaskInfo(1, 122, 123),
-            raas_jobs.JobTaskInfo(1, 122, 124),
-            raas_jobs.JobTaskInfo(1, 122, 125),
+            raas_jobs.JobTaskInfo(1, gpu_render, gpu_init),
+            raas_jobs.JobTaskInfo(1, gpu_render, gpu_render),
+            raas_jobs.JobTaskInfo(1, gpu_render, gpu_finish),
             2,
-            12,
+            cluster_id,
         )
 
 
@@ -99,12 +125,14 @@ def GetServer(pid):
 def GetServerFromType(cluster_type):
     if cluster_type == 'SCEBE':
         return '146.176.131.129'
+    if cluster_type == 'ENUCC':
+        return 'login.enucc.napier.ac.uk'
     raise ValueError("Unsupported cluster type: %s" % cluster_type)
 
 
 def GetSchedulerFromContext(context):
     blender_job_info_new = context.scene.raas_blender_job_info_new
-    if blender_job_info_new.cluster_type == 'SCEBE':
+    if blender_job_info_new.cluster_type in {'SCEBE', 'ENUCC'}:
         return 'SLURM'
     raise ValueError("Unsupported cluster type: %s" % blender_job_info_new.cluster_type)
 
@@ -123,35 +151,44 @@ def GetDAOpenCallProject(pid):
 
 
 def GetDAQueueMPIProcs(CommandTemplateId):
-    if CommandTemplateId == 124:
+    if CommandTemplateId in {124, 134}:
         return 1  # GPUs
     return 0
 
 
 # return cores,queue,script
 def GetDAQueueScript(ClusterId, CommandTemplateId):
-    if ClusterId != 12:
-        return None, None
-
-    if CommandTemplateId == 120:
+    if ClusterId == 12 and CommandTemplateId == 120:
         return 1, '~/braas-hpc/scripts/scebe-gpu-server-slurm/job_init.sh'
-    elif CommandTemplateId == 121:
+    elif ClusterId == 12 and CommandTemplateId == 121:
         return 1, '~/braas-hpc/scripts/scebe-gpu-server-slurm/run_blender_cpu.sh'
-    elif CommandTemplateId == 122:
+    elif ClusterId == 12 and CommandTemplateId == 122:
         return 1, '~/braas-hpc/scripts/scebe-gpu-server-slurm/job_finish.sh'
-    elif CommandTemplateId == 123:
+    elif ClusterId == 12 and CommandTemplateId == 123:
         return 1, '~/braas-hpc/scripts/scebe-gpu-server-slurm/job_init.sh'
-    elif CommandTemplateId == 124:
+    elif ClusterId == 12 and CommandTemplateId == 124:
         return 1, '~/braas-hpc/scripts/scebe-gpu-server-slurm/run_blender_gpu.sh'
-    elif CommandTemplateId == 125:
+    elif ClusterId == 12 and CommandTemplateId == 125:
         return 1, '~/braas-hpc/scripts/scebe-gpu-server-slurm/job_finish.sh'
+    elif ClusterId == 13 and CommandTemplateId == 130:
+        return 1, '~/braas-hpc/scripts/enucc-slurm/job_init.sh'
+    elif ClusterId == 13 and CommandTemplateId == 131:
+        return 1, '~/braas-hpc/scripts/enucc-slurm/run_blender_cpu.sh'
+    elif ClusterId == 13 and CommandTemplateId == 132:
+        return 1, '~/braas-hpc/scripts/enucc-slurm/job_finish.sh'
+    elif ClusterId == 13 and CommandTemplateId == 133:
+        return 1, '~/braas-hpc/scripts/enucc-slurm/job_init.sh'
+    elif ClusterId == 13 and CommandTemplateId == 134:
+        return 1, '~/braas-hpc/scripts/enucc-slurm/run_blender_gpu.sh'
+    elif ClusterId == 13 and CommandTemplateId == 135:
+        return 1, '~/braas-hpc/scripts/enucc-slurm/job_finish.sh'
 
     return None, None
 
 
 def GetDAJobSpecialFlags(context, ClusterId, CommandTemplateId, pid_queue):
     custom_flags = ''
-    if ClusterId == 12 and 'JOB_GPU' in context.scene.raas_blender_job_info_new.job_type:
+    if ClusterId in {12, 13} and 'JOB_GPU' in context.scene.raas_blender_job_info_new.job_type:
         custom_flags += ' --gres=gpu:1'
     return custom_flags
 
@@ -184,7 +221,7 @@ def GetCurrentPidInfo(context, preferences):
 
 
 def SetPidDir(preset):
-    if preset.cluster_name != "SCEBE":
+    if preset.cluster_name not in {"SCEBE", "ENUCC"}:
         raise Exception("Unknown cluster name")
 
     cmd = 'echo $HOME'

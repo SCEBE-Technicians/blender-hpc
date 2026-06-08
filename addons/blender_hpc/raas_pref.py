@@ -348,6 +348,15 @@ def cluster_partition_settings_callback(self, context):
         return getattr(raas_config, "%s_partitions" % self.cluster_name.capitalize())
 
 
+def enforce_enucc_job_type(self, context):
+    if self.cluster_name != 'ENUCC':
+        return
+
+    job_type = 'JOB_GPU' if self.partition_name == 'gpu' else 'JOB_CPU'
+    if self.job_type != job_type:
+        self.job_type = job_type
+
+
 class ClusterPresets(bpy.types.PropertyGroup):
     """
         A property group of cluster presets. Each presets has the following properties:
@@ -357,18 +366,21 @@ class ClusterPresets(bpy.types.PropertyGroup):
     cluster_name: bpy.props.EnumProperty(
         name="Cluster",
         description="Select a cluster",
-        items=raas_config.Cluster_items
+        items=raas_config.Cluster_items,
+        update=enforce_enucc_job_type
     )  # type: ignore
 
     partition_name: bpy.props.EnumProperty(
         name="Partition/Queue",
         description="Select a partition/queue",
-        items=cluster_partition_settings_callback
+        items=cluster_partition_settings_callback,
+        update=enforce_enucc_job_type
     )  # type: ignore
 
     job_type: bpy.props.EnumProperty(
         items=raas_config.JobQueue_items,
-        name="Type of Job (resources)"
+        name="Type of Job (resources)",
+        update=enforce_enucc_job_type
     )  # type: ignore
 
     is_enabled: bpy.props.BoolProperty(
@@ -746,7 +758,9 @@ class RaasPreferences(AddonPreferences):
             pid_box = raas_pid.column(align=True)
             pid_box.prop(preset, "cluster_name")
             pid_box.prop(preset, "partition_name")
-            pid_box.prop(preset, "job_type")
+            job_type_row = pid_box.row(align=True)
+            job_type_row.enabled = preset.cluster_name != 'ENUCC'
+            job_type_row.prop(preset, "job_type")
 
             raas_pid = box_row.split(**factor(1.0), align=True)
             pid_box = raas_pid.column(align=True)

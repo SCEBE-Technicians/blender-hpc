@@ -40,6 +40,8 @@ from . import raas_config
 from . import raas_connection
 
 ADDON_NAME = 'braas_hpc'
+DEPENDENCIES_PATH = bpy.utils.user_resource(
+    'SCRIPTS', path=os.path.join(ADDON_NAME, "dependencies"), create=True)
 
 log = logging.getLogger(__name__)
 
@@ -78,7 +80,14 @@ python_dependencies = (Dependency(module="paramiko", package="paramiko", name=No
 internal_dependencies = []
 
 
+def ensure_dependencies_path():
+    if DEPENDENCIES_PATH not in sys.path:
+        sys.path.insert(0, DEPENDENCIES_PATH)
+
+
 def import_module(module_name, global_name=None, reload=True):
+    ensure_dependencies_path()
+
     if global_name is None:
         global_name = module_name
 
@@ -98,16 +107,13 @@ def install_pip():
             python_exe = sys.executable
 
         # Check if pip is already installed
-        subprocess.run([python_exe, "-m", "pip", "--version"], check=True)
-
-        # Upgrade
-        subprocess.run([python_exe, "-m", "pip", "install",
-                        "--upgrade", "pip"], check=True)
+        subprocess.run([python_exe, "-m", "pip", "--version"],
+                       check=True, capture_output=True, text=True)
 
     except subprocess.CalledProcessError:
         import ensurepip
 
-        ensurepip.bootstrap()
+        ensurepip.bootstrap(user=True)
         os.environ.pop("PIP_REQ_TRACKER", None)
 
 
@@ -127,8 +133,16 @@ def install_and_import_module(module_name, package_name=None, global_name=None):
     else:
         python_exe = sys.executable
 
-    subprocess.run([python_exe, "-m", "pip", "install",
-                    package_name], check=True, env=environ_copy)
+    os.makedirs(DEPENDENCIES_PATH, exist_ok=True)
+    log.info("Installing %s into %s", package_name, DEPENDENCIES_PATH)
+    try:
+        subprocess.run([python_exe, "-m", "pip", "install",
+                        "--target", DEPENDENCIES_PATH, package_name],
+                       check=True, env=environ_copy, capture_output=True, text=True)
+    except subprocess.CalledProcessError as err:
+        log.error("Dependency install failed for %s\nstdout:\n%s\nstderr:\n%s",
+                  package_name, err.stdout, err.stderr)
+        raise
 
     # The installation succeeded, attempt to import the module again
     import_module(module_name, global_name)
@@ -602,7 +616,7 @@ class RaasPreferences(AddonPreferences):
 
     raas_scripts_repository: StringProperty(
         name='Repository',
-        default='https://github.com/It4innovations/braas-hpc.git'
+        default='https://github.com/SCEBE-Technicians/blender-hpc.git'
     )  # type: ignore
 
     raas_scripts_repository_branch: StringProperty(
@@ -919,7 +933,8 @@ def register():
                           global_name=dependency.name)
 
         preferences().dependencies_installed = True
-    except ModuleNotFoundError:
+    except ModuleNotFoundError as err:
+        log.info("Dependency check failed: %s; checked %s", err, DEPENDENCIES_PATH)
         preferences().dependencies_installed = False
 
     return

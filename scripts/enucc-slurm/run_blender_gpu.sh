@@ -57,4 +57,4 @@ if [ ${use_xorg} == "True"  ]; then
 fi
 ###############################################
 
-~/blender/blender --factory-startup --enable-autoexec -noaudio --background ${IN_DIR}/${BLEND_FILE} -E CYCLES -P ~/braas-hpc/scripts/enucc-slurm/use_gpu.py --render-output ${OUT_DIR}/###### ${FRAME_CMD} >> ${LOG} 2>> ${ERR}
+~/blender/blender --factory-startup --enable-autoexec -noaudio --background ${IN_DIR}/${BLEND_FILE} -E CYCLES -P ~/blender-hpc/scripts/enucc-slurm/use_gpu.py --render-output ${OUT_DIR}/###### ${FRAME_CMD} >> ${LOG} 2>> ${ERR}

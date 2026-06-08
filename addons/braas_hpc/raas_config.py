@@ -22,6 +22,8 @@
 
 import bpy
 
+REMOTE_ADDON_DIR = 'blender-hpc'
+
 Cluster_items_dict = {
     "SCEBE": "SCEBE GPU Server",
     "ENUCC": "ENUCC",
@@ -143,7 +145,7 @@ def GetDAServer(context):
 
 
 def GetDAClusterPath(context, project_dir, pid):
-    return project_dir + '/braas-hpc/direct'
+    return project_dir + '/' + REMOTE_ADDON_DIR + '/direct'
 
 
 def GetDAOpenCallProject(pid):
@@ -159,29 +161,29 @@ def GetDAQueueMPIProcs(CommandTemplateId):
 # return cores,queue,script
 def GetDAQueueScript(ClusterId, CommandTemplateId):
     if ClusterId == 12 and CommandTemplateId == 120:
-        return 1, '~/braas-hpc/scripts/scebe-gpu-server-slurm/job_init.sh'
+        return 1, '~/' + REMOTE_ADDON_DIR + '/scripts/scebe-gpu-server-slurm/job_init.sh'
     elif ClusterId == 12 and CommandTemplateId == 121:
-        return 1, '~/braas-hpc/scripts/scebe-gpu-server-slurm/run_blender_cpu.sh'
+        return 1, '~/' + REMOTE_ADDON_DIR + '/scripts/scebe-gpu-server-slurm/run_blender_cpu.sh'
     elif ClusterId == 12 and CommandTemplateId == 122:
-        return 1, '~/braas-hpc/scripts/scebe-gpu-server-slurm/job_finish.sh'
+        return 1, '~/' + REMOTE_ADDON_DIR + '/scripts/scebe-gpu-server-slurm/job_finish.sh'
     elif ClusterId == 12 and CommandTemplateId == 123:
-        return 1, '~/braas-hpc/scripts/scebe-gpu-server-slurm/job_init.sh'
+        return 1, '~/' + REMOTE_ADDON_DIR + '/scripts/scebe-gpu-server-slurm/job_init.sh'
     elif ClusterId == 12 and CommandTemplateId == 124:
-        return 1, '~/braas-hpc/scripts/scebe-gpu-server-slurm/run_blender_gpu.sh'
+        return 1, '~/' + REMOTE_ADDON_DIR + '/scripts/scebe-gpu-server-slurm/run_blender_gpu.sh'
     elif ClusterId == 12 and CommandTemplateId == 125:
-        return 1, '~/braas-hpc/scripts/scebe-gpu-server-slurm/job_finish.sh'
+        return 1, '~/' + REMOTE_ADDON_DIR + '/scripts/scebe-gpu-server-slurm/job_finish.sh'
     elif ClusterId == 13 and CommandTemplateId == 130:
-        return 1, '~/braas-hpc/scripts/enucc-slurm/job_init.sh'
+        return 1, '~/' + REMOTE_ADDON_DIR + '/scripts/enucc-slurm/job_init.sh'
     elif ClusterId == 13 and CommandTemplateId == 131:
-        return 1, '~/braas-hpc/scripts/enucc-slurm/run_blender_cpu.sh'
+        return 1, '~/' + REMOTE_ADDON_DIR + '/scripts/enucc-slurm/run_blender_cpu.sh'
     elif ClusterId == 13 and CommandTemplateId == 132:
-        return 1, '~/braas-hpc/scripts/enucc-slurm/job_finish.sh'
+        return 1, '~/' + REMOTE_ADDON_DIR + '/scripts/enucc-slurm/job_finish.sh'
     elif ClusterId == 13 and CommandTemplateId == 133:
-        return 1, '~/braas-hpc/scripts/enucc-slurm/job_init.sh'
+        return 1, '~/' + REMOTE_ADDON_DIR + '/scripts/enucc-slurm/job_init.sh'
     elif ClusterId == 13 and CommandTemplateId == 134:
-        return 1, '~/braas-hpc/scripts/enucc-slurm/run_blender_gpu.sh'
+        return 1, '~/' + REMOTE_ADDON_DIR + '/scripts/enucc-slurm/run_blender_gpu.sh'
     elif ClusterId == 13 and CommandTemplateId == 135:
-        return 1, '~/braas-hpc/scripts/enucc-slurm/job_finish.sh'
+        return 1, '~/' + REMOTE_ADDON_DIR + '/scripts/enucc-slurm/job_finish.sh'
 
     return None, None
 
@@ -194,7 +196,7 @@ def GetDAJobSpecialFlags(context, ClusterId, CommandTemplateId, pid_queue):
 
 
 def GetGitAddonCommand(repository, branch):
-    return 'if [ -d ~/braas-hpc ] ; then rm -rf ~/braas-hpc ; fi ; git clone -q -b ' + branch + ' ' + repository
+    return 'if [ -d ~/' + REMOTE_ADDON_DIR + ' ] ; then rm -rf ~/' + REMOTE_ADDON_DIR + ' ; fi ; git clone -q -b ' + branch + ' ' + repository + ' ~/' + REMOTE_ADDON_DIR
 
 
 def GetBlenderInstallCommand(preset, url_link):

@@ -157,11 +157,12 @@ class RAAS_OT_install_scripts(Operator):
     bl_description = ("Install scripts")
 
     def execute(self, context):
+        scripts_installed = False
         for cl in raas_config.Cluster_items:
             try:
 
                 for p in preferences().cluster_presets:
-                    if p.cluster_name == cl[0] and p.is_enabled and preferences().raas_scripts_installed == False:
+                    if p.cluster_name == cl[0] and p.is_enabled:
                         # TODO: MJ
                         if not preferences().check_valid_settings(p, type='INSTALL_SCRIPTS'):
                             return {"CANCELLED"}
@@ -172,7 +173,15 @@ class RAAS_OT_install_scripts(Operator):
                             preferences().raas_scripts_repository, preferences().raas_scripts_repository_branch)
                         if len(cmd) > 0:
                             server = context.scene.raas_config_functions.call_get_server_from_type(cl[0])
-                            raas_connection.ssh_command_sync(server, cmd, p)
+                            log.info("Install scripts on %s with command: %s", cl[0], cmd)
+                            res = raas_connection.ssh_command_sync(server, cmd, p)
+                            log.info("Install scripts on %s result: %s", cl[0], res.strip())
+
+                            script_dir = 'scebe-gpu-server-slurm' if cl[0] == 'SCEBE' else 'enucc-slurm'
+                            check_cmd = 'test -d ~/blender-hpc/scripts/%s && echo OK' % script_dir
+                            res = raas_connection.ssh_command_sync(server, check_cmd, p)
+                            if res.strip() != 'OK':
+                                raise Exception("Scripts were not found after install: ~/blender-hpc/scripts/%s" % script_dir)
 
                         # Install Blender
                         self.report({'INFO'}, "Install Blender on '%s'" % (cl[0]))
@@ -180,7 +189,9 @@ class RAAS_OT_install_scripts(Operator):
                                                                                                    preferences().raas_blender_link)
                         if len(cmd) > 0:
                             server = context.scene.raas_config_functions.call_get_server_from_type(cl[0])
-                            raas_connection.ssh_command_sync(server, cmd, p)
+                            log.info("Install Blender on %s with command: %s", cl[0], cmd)
+                            res = raas_connection.ssh_command_sync(server, cmd, p)
+                            log.info("Install Blender on %s result: %s", cl[0], res.strip())
 
                         # Apply patches
                         self.report({'INFO'}, "Apply patches on '%s'" % (cl[0]))
@@ -191,18 +202,27 @@ class RAAS_OT_install_scripts(Operator):
                             raas_connection.ssh_command_sync(server, cmd, p)
 
                         preferences().raas_scripts_installed = True
+                        scripts_installed = True
 
                         break
 
             except Exception as e:
                 import traceback
                 traceback.print_exc()
+                log.exception("Problem with %s on %s", self.bl_label, cl[0])
 
                 self.report({'ERROR'}, "Problem with %s: %s: %s" %
                             (self.bl_label, e.__class__, e))
                 self.report({'ERROR'}, "Scripts could not be installed.")
                 return {"CANCELLED"}
 
+        if not scripts_installed:
+            message = "No enabled cluster preset was found for script installation."
+            log.error(message)
+            self.report({'ERROR'}, message)
+            return {"CANCELLED"}
+
+        log.info("'%s' finished", self.bl_label)
         self.report({'INFO'}, "'%s' finished" % (self.bl_label))
         return {"FINISHED"}
 

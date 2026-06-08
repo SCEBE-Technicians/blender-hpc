@@ -1560,6 +1560,36 @@ def _paramiko_get(server, username, key_file, key_file_password, password, use_p
             raise Exception("paramiko command failed:  %s: %s" % (e.__class__, e))        
 
 
+def _paramiko_put_with_client(ssh, source, destination):
+        """Upload files with an existing Paramiko client."""
+        from scp import SCPClient
+
+        scp = None
+        try:
+            scp = SCPClient(ssh.get_transport())
+            scp.put(source, recursive=True, remote_path=destination)
+        except Exception as e:
+            raise Exception("paramiko command failed:  %s: %s" % (e.__class__, e))
+        finally:
+            if scp is not None:
+                scp.close()
+
+
+def _paramiko_get_with_client(ssh, source, destination):
+        """Download files with an existing Paramiko client."""
+        from scp import SCPClient
+
+        scp = None
+        try:
+            scp = SCPClient(ssh.get_transport())
+            scp.get(source, local_path=destination, recursive=True)
+        except Exception as e:
+            raise Exception("paramiko command failed:  %s: %s" % (e.__class__, e))
+        finally:
+            if scp is not None:
+                scp.close()
+
+
 async def start_transfer_files(context, job_id: int, token: str) -> None:
     """Start Transfer files."""   
 
@@ -1608,16 +1638,32 @@ async def transfer_files(context, fileTransfer, job_local_dir: str, job_remote_d
             print('copy from server to: %s' % (job_local_dir))
             await _asyncssh_get_async(serverHostname, username, key_file, key_file_password, password, use_password, use_password_2fa, source, destination)
     elif preset.raas_ssh_library == 'PARAMIKO':
+        session = bpy.context.scene.raas_session
+        ssh = session.paramiko_get_ssh(serverHostname)
+        if ssh is None or not session.is_alive(serverHostname, client_type='PARAMIKO'):
+            try:
+                session.show_dialog(serverHostname, username, key_file, key_file_password, password, use_password, use_password_2fa, client_type='PARAMIKO')
+            except Exception as e:
+                import paramiko
+                if isinstance(e.__cause__, paramiko.AuthenticationException) or "AuthenticationException" in str(e):
+                    session.close(serverHostname, client_type='PARAMIKO')
+                    bpy.ops.wm.raas_password_input('INVOKE_DEFAULT')
+                    raise Exception("SSH authentication failed. Re-enter your SSH password or 2FA code, then try the download again.")
+                raise
+            ssh = session.paramiko_get_ssh(serverHostname)
+        if ssh is None:
+            raise Exception("Paramiko SSH connection is not available")
+
         if to_cluster == True:
             source = job_local_dir
             destination = '%s/%s' % (str(sharedBasepath), job_remote_dir)
             print('copy from %s to server' % (job_local_dir))
-            await asyncio.to_thread(_paramiko_put, serverHostname, username, key_file, key_file_password, password, use_password, use_password_2fa, source, destination)
+            await asyncio.to_thread(_paramiko_put_with_client, ssh, source, destination)
         else:
             destination = job_local_dir
             source = '%s/%s' % (str(sharedBasepath), job_remote_dir)
             print('copy from server to: %s' % (job_local_dir))
-            await asyncio.to_thread(_paramiko_get, serverHostname, username, key_file, key_file_password, password, use_password, use_password_2fa, source, destination)
+            await asyncio.to_thread(_paramiko_get_with_client, ssh, source, destination)
 
     else:       
         user_server = '%s@%s' % (username, serverHostname) if username else serverHostname

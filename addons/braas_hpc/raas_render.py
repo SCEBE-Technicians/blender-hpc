@@ -428,6 +428,7 @@ class RAAS_OT_download_files(
                 remote_storage_out = raas_connection.convert_path_to_linux(item.Name) + '/out'
                 local_storage_out = raas_connection.get_job_local_storage(item.Name)
 
+                self.log.info("Downloading output files from %s to %s", remote_storage_out, local_storage_out)
                 await raas_connection.transfer_files_from_cluster(context, fileTransfer, remote_storage_out,
                                                                   str(local_storage_out), item.Id, self.token)
 
@@ -435,6 +436,7 @@ class RAAS_OT_download_files(
                 remote_storage_log = raas_connection.convert_path_to_linux(item.Name) + '/log'
                 local_storage_log = raas_connection.get_job_local_storage(item.Name)
 
+                self.log.info("Downloading log files from %s to %s", remote_storage_log, local_storage_log)
                 await raas_connection.transfer_files_from_cluster(context, fileTransfer, remote_storage_log,
                                                                   str(local_storage_log), item.Id, self.token)
 
@@ -442,15 +444,18 @@ class RAAS_OT_download_files(
                 remote_storage_job = raas_connection.convert_path_to_linux(item.Name) + '/job'
                 local_storage_job = raas_connection.get_job_local_storage(item.Name)
 
+                self.log.info("Downloading job files from %s to %s", remote_storage_job, local_storage_job)
                 await raas_connection.transfer_files_from_cluster(context, fileTransfer, remote_storage_job,
                                                                   str(local_storage_job), item.Id, self.token)
 
                 # End file transfer
                 await raas_connection.end_transfer_files(context, fileTransfer, item.Id, self.token)
+                self.log.info("Download finished for %s", item.Name)
 
             except Exception as e:
                 import traceback
                 traceback.print_exc()
+                self.log.exception("Problem with downloading files")
 
                 self.report({'ERROR'}, "Problem with downloading files: %s: %s" % (e.__class__, e))
                 context.window_manager.raas_status = "ERROR"

@@ -51,6 +51,8 @@ from . import raas_config
 import pathlib
 import json
 
+log = logging.getLogger(__name__)
+
 #############################################################################
 def is_verbose_debug():
     return bpy.app.debug_value == 256
@@ -80,6 +82,33 @@ def paramiko_load_private_key(key_file, key_file_password):
             errors.append("%s: %s: %s" % (key_class.__name__, exc.__class__.__name__, exc))
 
     raise Exception("Unable to load SSH private key '%s'. Tried: %s" % (key_file, "; ".join(errors)))
+
+
+def autodetect_private_key_file():
+    ssh_dir = Path.home() / '.ssh'
+    key_names = ('id_ed25519', 'id_rsa', 'id_ecdsa', 'id_dsa')
+
+    for key_name in key_names:
+        key_file = ssh_dir / key_name
+        if key_file.is_file():
+            return str(key_file)
+
+    return ''
+
+
+def get_preset_private_key_file(preset):
+    if preset.raas_da_use_password:
+        return ''
+
+    if preset.raas_private_key_path:
+        return preset.raas_private_key_path
+
+    key_file = autodetect_private_key_file()
+    if key_file:
+        preset.raas_private_key_path = key_file
+        log.info("Auto-detected SSH private key: %s", key_file)
+
+    return key_file
 
 
 def get_ssh_key_file():
@@ -1200,7 +1229,7 @@ async def ssh_command(server, command, preset):
     
             
     username = preset.raas_da_username
-    key_file = preset.raas_private_key_path
+    key_file = get_preset_private_key_file(preset)
     key_file_password = preset.raas_private_key_password
     password = preset.raas_da_password
     use_password = preset.raas_da_use_password
@@ -1218,7 +1247,7 @@ def ssh_command_sync(server, command, preset):
         
         
     username = preset.raas_da_username
-    key_file = preset.raas_private_key_path
+    key_file = get_preset_private_key_file(preset)
     key_file_password = preset.raas_private_key_password
     password = preset.raas_da_password
     use_password = preset.raas_da_use_password
@@ -1237,7 +1266,7 @@ async def ssh_command_jump(server1, server2, command, preset):
     
             
     username = preset.raas_da_username
-    key_file = preset.raas_private_key_path
+    key_file = get_preset_private_key_file(preset)
     key_file_password = preset.raas_private_key_password
     password = preset.raas_da_password
     use_password = preset.raas_da_use_password
@@ -1255,7 +1284,7 @@ def ssh_command_sync_jump(server1, server2, command, preset):
         
         
     username = preset.raas_da_username
-    key_file = preset.raas_private_key_path
+    key_file = get_preset_private_key_file(preset)
     key_file_password = preset.raas_private_key_password
     password = preset.raas_da_password
     use_password = preset.raas_da_use_password
@@ -1510,7 +1539,7 @@ async def transfer_files(context, fileTransfer, job_local_dir: str, job_remote_d
     sharedBasepath = get_direct_access_remote_storage(context)    
     
     username = preset.raas_da_username
-    key_file = preset.raas_private_key_path
+    key_file = get_preset_private_key_file(preset)
     key_file_password = preset.raas_private_key_password
     password = preset.raas_da_password
     use_password = preset.raas_da_use_password

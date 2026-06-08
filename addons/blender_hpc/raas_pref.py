@@ -313,7 +313,9 @@ class RAAS_OT_NewClusterPreset(bpy.types.Operator):
 
     def execute(self, context):
         addonprefs = preferences()
-        addonprefs.cluster_presets.add()  # New preset
+        preset = addonprefs.cluster_presets.add()  # New preset
+        if not preset.raas_da_use_password:
+            raas_connection.get_preset_private_key_file(preset)
 
         return {'FINISHED'}
 
@@ -667,7 +669,7 @@ class RaasPreferences(AddonPreferences):
                     message='Username is not set in preferences', icon='ERROR')
                 return False
 
-            if not cl.raas_da_use_password and len(cl.raas_private_key_path) == 0:
+            if not cl.raas_da_use_password and len(raas_connection.get_preset_private_key_file(cl)) == 0:
                 show_message_box(
                     message='Private Key File is not set in preferences', icon='ERROR')
                 return False

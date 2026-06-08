@@ -64,12 +64,6 @@ ssh_library_items = [
     ("ASYNCSSH", "AsyncSSH", ""),
 ]
 
-account_types_items = [
-    ("EDUID", "e-INFRA CZ (eduID.cz)", ""),
-    ("IT4I", "IT4I", ""),
-]
-
-
 def GetBlenderClusterVersion():
     return (str(bpy.app.version_string)).replace(' ', '_')
 
@@ -215,7 +209,7 @@ def GetBlenderPatchCommand(preset, url_link):
 
 def GetCurrentPidInfo(context, preferences):
     blender_job_info_new = context.scene.raas_blender_job_info_new
-    name = blender_job_info_new.job_allocation
+    name = blender_job_info_new.cluster_type
     queue = blender_job_info_new.job_partition
     dir = blender_job_info_new.job_remote_dir
 

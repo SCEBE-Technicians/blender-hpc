@@ -80,7 +80,7 @@ class RaasButtonsPanel:
 
     @classmethod
     def poll(cls, context):
-        return context.engine == 'CYCLES' or context.engine == 'BRAAS_HPC'
+        return context.engine == 'CYCLES' or context.engine == 'BLENDER_HPC'
 
 
 class RAAS_PT_simplify(RaasButtonsPanel, Panel):
@@ -239,7 +239,6 @@ class RAAS_PG_BlenderJobInfo(PropertyGroup):
 
     job_type: bpy.props.EnumProperty(items=raas_config.JobQueue_items, name="Type of Job (resources)")  # type: ignore
     job_remote_dir: bpy.props.StringProperty(name="Remote directory", options={'TEXTEDIT_UPDATE'})  # type: ignore
-    job_allocation: bpy.props.StringProperty(name="Allocation project name")  # type: ignore
     job_partition: bpy.props.StringProperty(name="Queue/Partition name")  # type: ignore
 
     frame_start: bpy.props.IntProperty(name="FrameStart")  # type: ignore
@@ -325,12 +324,6 @@ class RAAS_PASSWORD_OT_input(bpy.types.Operator):
         subtype='PASSWORD'  # <-- masks input in Blender 3.2+
     )  # type: ignore
 
-    password_2fa: bpy.props.StringProperty(
-        name="2FA Code",
-        description="Enter your 2FA code",
-        subtype='PASSWORD'  # <-- masks input in Blender 3.2+
-    )  # type: ignore
-
     server: bpy.props.StringProperty(
         name="Server"
     )  # type: ignore
@@ -356,11 +349,6 @@ class RAAS_PASSWORD_OT_input(bpy.types.Operator):
         box1_row = box1.row(align=True)
         box1_row.prop(self, 'password', text='')
 
-        box2 = box.split(**raas_pref.factor(0.25), align=True)
-        box2.label(text='2FA Code:')
-        box2_row = box2.row(align=True)
-        box2_row.prop(self, 'password_2fa', text='')
-
     def execute(self, context):
         self.report({'INFO'}, f"Password entered (hidden): {len(self.password)} chars")
 
@@ -368,7 +356,7 @@ class RAAS_PASSWORD_OT_input(bpy.types.Operator):
         client_type = session.ssh_client_type
 
         if client_type == 'PARAMIKO':
-            session.paramiko_create_session(self.password, self.password_2fa)
+            session.paramiko_create_session(self.password)
         elif client_type == 'ASYNCSSH':
             # For AsyncSSH, we need to run the async method
             import asyncio
@@ -376,19 +364,19 @@ class RAAS_PASSWORD_OT_input(bpy.types.Operator):
                 loop = asyncio.get_event_loop()
                 if loop.is_running():
                     # If loop is running, schedule the coroutine
-                    future = asyncio.ensure_future(session.asyncssh_create_session(self.password, self.password_2fa))
+                    future = asyncio.ensure_future(session.asyncssh_create_session(self.password))
                     # Wait for completion (this is a hack, ideally should be handled differently)
                     import time
                     while not future.done():
                         time.sleep(0.01)
                 else:
-                    loop.run_until_complete(session.asyncssh_create_session(self.password, self.password_2fa))
+                    loop.run_until_complete(session.asyncssh_create_session(self.password))
             except RuntimeError:
                 # No event loop in current thread, create new one
                 loop = asyncio.new_event_loop()
                 asyncio.set_event_loop(loop)
                 try:
-                    loop.run_until_complete(session.asyncssh_create_session(self.password, self.password_2fa))
+                    loop.run_until_complete(session.asyncssh_create_session(self.password))
                 finally:
                     loop.close()
 
@@ -628,9 +616,8 @@ class RAAS_OT_submit_job(
 
             # Check the configuration was selected
             if context.scene.raas_blender_job_info_new.cluster_type == "" or \
-                    context.scene.raas_blender_job_info_new.job_partition == "" or \
-                    context.scene.raas_blender_job_info_new.job_allocation == "":
-                self.report({'ERROR'}, 'Select a configuration (cluster, partition, allocation).')
+                    context.scene.raas_blender_job_info_new.job_partition == "":
+                self.report({'ERROR'}, 'Select a configuration (cluster, partition).')
                 context.window_manager.raas_status = "ERROR"
                 context.window_manager.raas_status_txt = "There is an error! Check Info Editor!"
 
@@ -693,7 +680,6 @@ class RAAS_OT_submit_job(
                 'job_arrays': job_info.job_arrays,
                 'job_type': job_info.job_type,
                 'job_remote_dir': job_info.job_remote_dir,
-                'job_allocation': job_info.job_allocation,
                 'job_partition': job_info.job_partition,
                 'frame_start': job_info.frame_start,
                 'frame_end': job_info.frame_end,
@@ -826,11 +812,10 @@ class RAAS_OT_explore_file_path(Operator):
 
 
 class RAAS_UL_ClusterPresets(bpy.types.UIList):
-    '''Draws table items - allocation, cluster and partition name.'''
+    '''Draws table items - cluster and partition name.'''
 
     def draw_item(self, context, layout, data, item, icon, active_data, active_propname):
         if item.is_enabled:
-            layout.label(text=item.allocation_name)
             layout.label(text=raas_config.Cluster_items_dict[item.cluster_name])
             layout.label(text=item.partition_name)
             layout.label(text=raas_config.JobQueue_items_dict[item.job_type])
@@ -850,8 +835,7 @@ class RAAS_UL_ClusterPresets(bpy.types.UIList):
         filtered = [0] * len(items)
 
         for i, item in enumerate(items):
-            if (self.filter_name.lower() in item.allocation_name.lower() or
-                    self.filter_name.lower() in item.cluster_name.lower() or
+            if (self.filter_name.lower() in item.cluster_name.lower() or
                     self.filter_name.lower() in item.partition_name.lower()):
                 filtered[i] |= self.bitflag_filter_item
 
@@ -860,7 +844,7 @@ class RAAS_UL_ClusterPresets(bpy.types.UIList):
 
 def update_job_info_preset(context):
     '''
-        This method updates RAAS_PG_BlenderJobInfo (cluster, queue, allocation, directory).
+        This method updates RAAS_PG_BlenderJobInfo (cluster, queue, directory).
         This has to be called before accessing the cluster! I.e, before submission and monitoring -> the table of 
         cluster presets controls what cluster to access.
     '''
@@ -877,7 +861,6 @@ def update_job_info_preset(context):
         my_property_group.job_remote_dir = preset.working_dir
         my_property_group.cluster_type = preset.cluster_name
         my_property_group.job_partition = preset.partition_name
-        my_property_group.job_allocation = preset.allocation_name
 
         my_property_group.job_type = preset.job_type
 
@@ -899,8 +882,6 @@ class RAAS_PT_NewJob(RaasButtonsPanel, Panel):
         # Header ----------------------------------------
         box = layout.box()
         row = box.row()
-        col = row.column()
-        col.label(text="Allocation")
         col = row.column()
         col.label(text="Cluster")
         col = row.column()

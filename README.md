@@ -2,7 +2,7 @@
 
 A Blender add-on for submitting Cycles render jobs to Edinburgh Napier University HPC resources, including ENUCC and the SCEBE GPU server.
 
-This project is a fork of the original [brass-hpc](https://github.com/It4innovations/blender-hpc) project from IT4Innovations. The fork adapts the add-on for direct SSH-based rendering workflows on Edinburgh Napier University infrastructure, with bundled Slurm scripts for ENUCC and `scebe-gpu-server`.
+This project is a fork of the original [blender-hpc](https://github.com/It4innovations/blender-hpc) project from IT4Innovations. The fork adapts the add-on for direct SSH-based rendering workflows on Edinburgh Napier University infrastructure, with bundled Slurm scripts for ENUCC and `scebe-gpu-server`.
 
 ## What It Does
 
@@ -94,27 +94,27 @@ For SCEBE, Slurm accounting may be disabled, so the add-on uses `squeue` and loc
 From the repository root, create a zip containing the Blender add-on folder:
 
 ```powershell
-Compress-Archive -Path addons\braas_hpc -DestinationPath braas_hpc.zip -Force
+Compress-Archive -Path addons\blender_hpc -DestinationPath blender_hpc.zip -Force
 ```
 
 The zip should contain this structure:
 
 ```text
-braas_hpc/
+blender_hpc/
   __init__.py
   raas_config.py
   raas_render.py
   ...
 ```
 
-Do not zip the whole repository unless the top-level folder inside the zip is `braas_hpc`.
+Do not zip the whole repository unless the top-level folder inside the zip is `blender_hpc`.
 
 ### 2. Install In Blender
 
 1. Open Blender.
 2. Go to `Edit > Preferences > Add-ons`.
 3. Click `Install...`.
-4. Select `braas_hpc.zip`.
+4. Select `blender_hpc.zip`.
 5. Enable `System: blender-hpc`.
 
 ### 3. Install Dependencies
@@ -137,8 +137,6 @@ In `Edit > Preferences > Add-ons > blender-hpc`:
 6. Configure SSH authentication.
 7. Set or discover the working directory.
 8. Enable the preset.
-
-For SCEBE and ENUCC, allocation/account can normally be left blank if the local Slurm configuration does not require `--account`.
 
 ### 5. Install Scripts And Blender On The Server
 
@@ -253,13 +251,13 @@ Animation jobs render frames as individual frame outputs. The add-on does not st
 The add-on writes logs to Blender's user config directory:
 
 ```text
-C:\Users\<user>\AppData\Roaming\Blender Foundation\Blender\<version>\config\braas_hpc\braas_hpc.log
+C:\Users\<user>\AppData\Roaming\Blender Foundation\Blender\<version>\config\blender-hpc\blender-hpc.log
 ```
 
 For example:
 
 ```text
-C:\Users\40021033\AppData\Roaming\Blender Foundation\Blender\5.1\config\braas_hpc\braas_hpc.log
+C:\Users\40021033\AppData\Roaming\Blender Foundation\Blender\5.1\config\blender-hpc\blender-hpc.log
 ```
 
 Use this log when debugging submit, transfer, SSH, or job-list issues. Python tracebacks are written there for operator failures.
@@ -268,7 +266,7 @@ Use this log when debugging submit, transfer, SSH, or job-list issues. Python tr
 
 ### Add-on Does Not Appear In Blender
 
-Check the zip structure. Blender must see `braas_hpc/__init__.py` at the top level inside the zip.
+Check the zip structure. Blender must see `blender_hpc/__init__.py` at the top level inside the zip.
 
 ### Test Connection Is Skipped
 
@@ -278,10 +276,6 @@ The selected preset is disabled. In add-on preferences, check:
 - SSH key/password settings are valid.
 - Working directory is set.
 - Preset is enabled.
-
-### Job Stays Pending With `InvalidAccount`
-
-On SCEBE and ENUCC, do not submit with a Slurm account unless the server administrator has configured one for your user. These paths in this fork omit `--account`.
 
 ### Slurm Accounting Is Disabled
 
@@ -312,7 +306,7 @@ Check the remote log files in the job `log/` directory. Also confirm:
 ## Project Layout
 
 ```text
-addons/braas_hpc/                  Blender add-on source
+addons/blender_hpc/                  Blender add-on source
 scripts/scebe-gpu-server-slurm/    SCEBE Slurm render scripts
 scripts/enucc-slurm/               ENUCC Slurm render scripts
 img/                               README/UI images from the original project

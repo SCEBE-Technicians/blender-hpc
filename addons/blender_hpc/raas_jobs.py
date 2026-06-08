@@ -163,10 +163,6 @@ async def CreateJobTask3Dep(context,
                 "Value": use_mpi1
             },
             {
-                "Name": "allocation_name",
-                "Value": blender_job_info_new.job_allocation
-            },
-            {
                 "Name": "max_jobs",
                 "Value": max_jobs
             },
@@ -227,10 +223,6 @@ async def CreateJobTask3Dep(context,
             {
                 "Name": "use_mpi",
                 "Value": use_mpi2
-            },
-            {
-                "Name": "allocation_name",
-                "Value": blender_job_info_new.job_allocation
             },
             {
                 "Name": "username",
@@ -296,10 +288,6 @@ async def CreateJobTask3Dep(context,
             {
                 "Name": "use_mpi",
                 "Value": use_mpi3
-            },
-            {
-                "Name": "allocation_name",
-                "Value": blender_job_info_new.job_allocation
             },
             {
                 "Name": "max_jobs",
@@ -427,11 +415,7 @@ def CmdCreateSLURMJob(context):
         xorg_true = ''
 
         custom_flags = context.scene.raas_config_functions.call_get_special_job_flags(context, cluster_id, command_template_id, pid_queue)
-        account_arg = ''
-        if context.scene.raas_blender_job_info_new.cluster_type not in {'SCEBE', 'ENUCC'}:
-            account_arg = ' --account ' + raas_config.GetDAOpenCallProject(pid_name)
-
-        cmd = cmd + '_' + str(task_id) + '=$(echo \' ' + script + ' ' + file + ' \' | sbatch' + account_arg + ' --export=' + job_env + ' --nodes=' + \
+        cmd = cmd + '_' + str(task_id) + '=$(echo \' ' + script + ' ' + file + ' \' | sbatch --export=' + job_env + ' --nodes=' + \
             str(nodes) + ' --job-name \"' + job_project + '\" --time=' + walltime + ' --partition=' + pid_queue + \
             custom_flags + ' ' + job_array + ' --error=' + work_dir_stderr + ' --output=' + work_dir_stdout + \
             depends_on + xorg_true + ' ' + script + ' ' + file + '); echo ${_' + str(task_id) + '##* };'
@@ -699,7 +683,7 @@ def slurm_split_job_line(line):
 
 
 def slurm_get_job_name(elements):
-    """Get the BRaaS job directory name from a parsed .job line."""
+    """Get the blender-hpc job directory name from a parsed .job line."""
     if elements[0].endswith('.job'):
         return elements[0][:-4]
     return elements[0].split(".")[0]

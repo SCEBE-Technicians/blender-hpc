@@ -36,7 +36,7 @@ def _setup_file_logging():
     """Write addon logs to Blender's user config directory."""
 
     logger = logging.getLogger(__package__ or __name__)
-    log_path = Path(bpy.utils.user_resource('CONFIG', path="braas_hpc", create=True)) / "braas_hpc.log"
+    log_path = Path(bpy.utils.user_resource('CONFIG', path="blender-hpc", create=True)) / "blender-hpc.log"
     log_path_str = str(log_path)
 
     for handler in logger.handlers:

@@ -89,7 +89,7 @@ def get_ssh_key_file():
 def get_cluster_presets():
     presets = []  # to be returned in EnumProperty
     for preset in raas_pref.preferences().cluster_presets:
-        presets.append(('%s, %s, %s' % (preset.cluster_name, preset.allocation_name, preset.partition_name), '', ''))
+        presets.append(('%s, %s' % (preset.cluster_name, preset.partition_name), '', ''))
     return presets
 
 def get_pref_storage_dir():
@@ -509,7 +509,6 @@ class RaasSession:
         self.key_file = None
         self.key_file_password = None
         self.password = None 
-        self.password_2fa = None
         self.use_password = None
         self.ssh_command_proc = None
         self.ssh_command_jump_proc = None
@@ -631,70 +630,17 @@ class RaasSession:
             return not self.password is None and len(self.password) > 0
         return not self.key_file is None and len(self.key_file) > 0
 
-    def paramiko_create_session(self, password, password_2fa=None):
+    def paramiko_create_session(self, password):
         import paramiko
-        class Custom2FASSHClient(paramiko.SSHClient):
-            """Custom SSH client that handles 2FA authentication"""
-            
-            def __init__(self, password=None, totp_code=None):
-                super().__init__()
-                self.password = password
-                self.totp_code = totp_code
-                
-            def _auth(self, username, *args, **kwargs):
-                """Override the authentication method to handle 2FA"""        
-                
-                # First try the original authentication
-                try:
-                    if not self.totp_code is None:
-                        raise paramiko.AuthenticationException("Trigger 2FA auth")
-                    
-                    return super()._auth(username, *args, **kwargs)
-                except paramiko.AuthenticationException as e:
-                    # If original auth fails and we have 2FA code, try auth
-                    if self.totp_code and self._transport:
-                        try:
-                            # Use authentication for 2FA
-                            def auth_handler(title, instructions, prompt_list):
-                                responses = []
-                                for prompt_text, echo in prompt_list:
-                                    prompt_lower = prompt_text.lower()
-                                    
-                                    # Check for password prompts
-                                    if any(keyword in prompt_lower for keyword in ['password', 'passphrase']) and not echo:
-                                        responses.append(self.password or '')
-                                    # Check for 2FA prompts
-                                    elif any(keyword in prompt_lower for keyword in ['verification', 'authenticator', 'token', 'code', '2fa', 'totp']):
-                                        responses.append(self.totp_code or '')
-                                    else:
-                                        # Default to TOTP code for unknown prompts
-                                        responses.append(self.totp_code or '')
-                                
-                                return responses
-                            
-                            # Try authentication
-                            self._transport.auth_interactive(username, auth_handler)
-                            return
-                        except Exception as auth_ex:
-                            raise paramiko.AuthenticationException(f"2FA authentication failed: {auth_ex}")
-                    
-                    # Re-raise original exception if no 2FA handling
-                    raise e        
-
         if not password is None:
             if self.use_password:
                 self.password = password
             else:
                 self.key_file_password = password
-
-        if not password_2fa is None and len(password_2fa) > 0:
-            self.password_2fa = password_2fa
-        else:
-            self.password_2fa = None
  
         ssh = None
         try: 
-            ssh = Custom2FASSHClient(password=self.password, totp_code=self.password_2fa)           
+            ssh = paramiko.SSHClient()
             ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
             ssh.load_system_host_keys()
 
@@ -731,8 +677,8 @@ class RaasSession:
 
             raise Exception("paramiko ssh command failed:  %s: %s" % (e.__class__, e))
     
-    async def asyncssh_create_session(self, password, password_2fa=None):
-        """Create AsyncSSH session with 2FA support"""
+    async def asyncssh_create_session(self, password):
+        """Create AsyncSSH session."""
         import asyncssh
         
         if not password is None:
@@ -740,11 +686,6 @@ class RaasSession:
                 self.password = password
             else:
                 self.key_file_password = password
-
-        if not password_2fa is None and len(password_2fa) > 0:
-            self.password_2fa = password_2fa
-        else:
-            self.password_2fa = None
  
         ssh = None
         try:
@@ -762,61 +703,20 @@ class RaasSession:
             
             # Connect to server
             if self.use_password:
-                # Handle 2FA with keyboard auth
-                if self.password_2fa:
-                    def kbdint_handler(name, instructions, prompts):
-                        responses = []
-                        for prompt_text, echo in prompts:
-                            prompt_lower = prompt_text.lower()
-                            if any(keyword in prompt_lower for keyword in ['password', 'passphrase']) and not echo:
-                                responses.append(self.password or '')
-                            elif any(keyword in prompt_lower for keyword in ['verification', 'authenticator', 'token', 'code', '2fa', 'totp']):
-                                responses.append(self.password_2fa or '')
-                            else:
-                                responses.append(self.password_2fa or '')
-                        return responses
-                    
-                    ssh = await asyncssh.connect(
-                        self.server,
-                        username=self.username,
-                        password=self.password,
-                        kbdint_handler=kbdint_handler,
-                        known_hosts=None
-                    )
-                else:
-                    ssh = await asyncssh.connect(
-                        self.server,
-                        username=self.username,
-                        password=self.password,
-                        known_hosts=None
-                    )
+                ssh = await asyncssh.connect(
+                    self.server,
+                    username=self.username,
+                    password=self.password,
+                    known_hosts=None
+                )
             else:
                 # Key-based authentication
-                if self.password_2fa:
-                    def kbdint_handler(name, instructions, prompts):
-                        responses = []
-                        for prompt_text, echo in prompts:
-                            prompt_lower = prompt_text.lower()
-                            if any(keyword in prompt_lower for keyword in ['verification', 'authenticator', 'token', 'code', '2fa', 'totp']):
-                                responses.append(self.password_2fa or '')
-                            else:
-                                responses.append(self.password_2fa or '')
-                        return responses
-                    
-                    ssh = await asyncssh.connect(
-                        self.server,
-                        username=self.username,
-                        client_keys=client_keys,
-                        kbdint_handler=kbdint_handler,
-                        known_hosts=None
-                    )
-                else:
-                    ssh = await asyncssh.connect(
-                        self.server,
-                        username=self.username,
-                        client_keys=client_keys,
-                        known_hosts=None
-                    )
+                ssh = await asyncssh.connect(
+                    self.server,
+                    username=self.username,
+                    client_keys=client_keys,
+                    known_hosts=None
+                )
             
             # Store the SSH client in the dict with server as key
             self.asyncssh_ssh_clients[self.server] = ssh
@@ -829,7 +729,7 @@ class RaasSession:
 
             raise Exception("asyncssh ssh command failed:  %s: %s" % (e.__class__, e))
         
-    def show_dialog(self, server, username, key_file, key_file_password, password, use_password, use_password_2fa, client_type=None):
+    def show_dialog(self, server, username, key_file, key_file_password, password, use_password, client_type=None):
         """Show password dialog and create SSH session (supports both Paramiko and AsyncSSH)"""
         if client_type is None:
             client_type = self.ssh_client_type
@@ -842,7 +742,6 @@ class RaasSession:
             self.key_file = key_file
             self.key_file_password = key_file_password
             self.password = password
-            self.password_2fa = None
             self.use_password = use_password
             self.ssh_client_type = client_type
 
@@ -856,27 +755,27 @@ class RaasSession:
 
                 self.key_file = resolved_key_file
 
-            if self.check_password() and not use_password_2fa:
+            if self.check_password():
                 if client_type == 'PARAMIKO':
-                    self.paramiko_create_session(None, None)
+                    self.paramiko_create_session(None)
                 elif client_type == 'ASYNCSSH':
                     # Use existing event loop if available, otherwise create new one
                     try:
                         loop = asyncio.get_event_loop()
                         if loop.is_running():
                             # If loop is running, schedule the coroutine
-                            future = asyncio.ensure_future(self.asyncssh_create_session(None, None))
+                            future = asyncio.ensure_future(self.asyncssh_create_session(None))
                             # Wait for completion (this is a hack, ideally should be handled differently)
                             while not future.done():
                                 time.sleep(0.01)
                         else:
-                            loop.run_until_complete(self.asyncssh_create_session(None, None))
+                            loop.run_until_complete(self.asyncssh_create_session(None))
                     except RuntimeError:
                         # No event loop in current thread, create new one
                         loop = asyncio.new_event_loop()
                         asyncio.set_event_loop(loop)
                         try:
-                            loop.run_until_complete(self.asyncssh_create_session(None, None))
+                            loop.run_until_complete(self.asyncssh_create_session(None))
                         finally:
                             loop.close()
             else:
@@ -1072,12 +971,12 @@ def _ssh_sync(key_file, server, username, command):
 
     return str(stdout.decode())  
 
-async def _asyncssh_ssh_async(server, username, key_file, key_file_password, password, use_password, use_password_2fa, command):
+async def _asyncssh_ssh_async(server, username, key_file, key_file_password, password, use_password, command):
         """ Execute an asyncssh ssh command (async version) """
 
         import asyncssh
 
-        bpy.context.scene.raas_session.show_dialog(server, username, key_file, key_file_password, password, use_password, use_password_2fa, client_type='ASYNCSSH')
+        bpy.context.scene.raas_session.show_dialog(server, username, key_file, key_file_password, password, use_password, client_type='ASYNCSSH')
 
         try:
             # Get the SSH connection from the session
@@ -1099,7 +998,7 @@ async def _asyncssh_ssh_async(server, username, key_file, key_file_password, pas
         except Exception as e:
             raise Exception("asyncssh ssh command failed: %s: %s" % (e.__class__, e))
 
-def _asyncssh_ssh(server, username, key_file, key_file_password, password, use_password, use_password_2fa, command):
+def _asyncssh_ssh(server, username, key_file, key_file_password, password, use_password, command):
         """ Execute an asyncssh ssh command (sync wrapper) """
 
         import asyncio
@@ -1111,24 +1010,24 @@ def _asyncssh_ssh(server, username, key_file, key_file_password, password, use_p
                 # If loop is already running (in Blender context), we can't use run_until_complete
                 # This should not happen if called from sync context
                 raise RuntimeError("Cannot call sync version from async context")
-            result = loop.run_until_complete(_asyncssh_ssh_async(server, username, key_file, key_file_password, password, use_password, use_password_2fa, command))
+            result = loop.run_until_complete(_asyncssh_ssh_async(server, username, key_file, key_file_password, password, use_password, command))
         except RuntimeError:
             # Create new event loop
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
             try:
-                result = loop.run_until_complete(_asyncssh_ssh_async(server, username, key_file, key_file_password, password, use_password, use_password_2fa, command))
+                result = loop.run_until_complete(_asyncssh_ssh_async(server, username, key_file, key_file_password, password, use_password, command))
             finally:
                 loop.close()
 
         return result
 
-def _paramiko_ssh(server, username, key_file, key_file_password, password, use_password, use_password_2fa, command):
+def _paramiko_ssh(server, username, key_file, key_file_password, password, use_password, command):
         """ Execute an paramiko ssh command """
 
         import paramiko
 
-        bpy.context.scene.raas_session.show_dialog(server, username, key_file, key_file_password, password, use_password, use_password_2fa, client_type='PARAMIKO')
+        bpy.context.scene.raas_session.show_dialog(server, username, key_file, key_file_password, password, use_password, client_type='PARAMIKO')
 
         result = None
         try: 
@@ -1153,12 +1052,12 @@ def _paramiko_ssh(server, username, key_file, key_file_password, password, use_p
 
         return ''.join(result)
 
-async def _asyncssh_ssh_jump_async(server1, server2, username, key_file, key_file_password, password, use_password, use_password_2fa, command):
+async def _asyncssh_ssh_jump_async(server1, server2, username, key_file, key_file_password, password, use_password, command):
         """ Execute an asyncssh ssh command through a jump host (async version) """
 
         import asyncssh
 
-        bpy.context.scene.raas_session.show_dialog(server1, username, key_file, key_file_password, password, use_password, use_password_2fa, client_type='ASYNCSSH')
+        bpy.context.scene.raas_session.show_dialog(server1, username, key_file, key_file_password, password, use_password, client_type='ASYNCSSH')
 
         try:
             # Get the SSH connection to the jump host from the session
@@ -1213,7 +1112,7 @@ async def _asyncssh_ssh_jump_async(server1, server2, username, key_file, key_fil
         except Exception as e:
             raise Exception("asyncssh ssh jump command failed: %s: %s" % (e.__class__, e))
 
-def _asyncssh_ssh_jump(server1, server2, username, key_file, key_file_password, password, use_password, use_password_2fa, command):
+def _asyncssh_ssh_jump(server1, server2, username, key_file, key_file_password, password, use_password, command):
         """ Execute an asyncssh ssh command through a jump host (sync wrapper) """
 
         import asyncio
@@ -1224,24 +1123,24 @@ def _asyncssh_ssh_jump(server1, server2, username, key_file, key_file_password, 
             if loop.is_running():
                 # If loop is already running (in Blender context), we can't use run_until_complete
                 raise RuntimeError("Cannot call sync version from async context")
-            result = loop.run_until_complete(_asyncssh_ssh_jump_async(server1, server2, username, key_file, key_file_password, password, use_password, use_password_2fa, command))
+            result = loop.run_until_complete(_asyncssh_ssh_jump_async(server1, server2, username, key_file, key_file_password, password, use_password, command))
         except RuntimeError:
             # Create new event loop
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
             try:
-                result = loop.run_until_complete(_asyncssh_ssh_jump_async(server1, server2, username, key_file, key_file_password, password, use_password, use_password_2fa, command))
+                result = loop.run_until_complete(_asyncssh_ssh_jump_async(server1, server2, username, key_file, key_file_password, password, use_password, command))
             finally:
                 loop.close()
 
         return result
 
-def _paramiko_ssh_jump(server1, server2, username, key_file, key_file_password, password, use_password, use_password_2fa, command):
+def _paramiko_ssh_jump(server1, server2, username, key_file, key_file_password, password, use_password, command):
         """ Execute an paramiko ssh command through a jump host (server1 -> server2) """
 
         import paramiko
 
-        bpy.context.scene.raas_session.show_dialog(server1, username, key_file, key_file_password, password, use_password, use_password_2fa, client_type='PARAMIKO')
+        bpy.context.scene.raas_session.show_dialog(server1, username, key_file, key_file_password, password, use_password, client_type='PARAMIKO')
 
         result = None
         ssh_jump = None
@@ -1305,12 +1204,11 @@ async def ssh_command(server, command, preset):
     key_file_password = preset.raas_private_key_password
     password = preset.raas_da_password
     use_password = preset.raas_da_use_password
-    use_password_2fa = preset.raas_use_2FA
     
     if preset.raas_ssh_library == 'ASYNCSSH':
-        return await _asyncssh_ssh_async(server, username, key_file, key_file_password, password, use_password, use_password_2fa, command)
+        return await _asyncssh_ssh_async(server, username, key_file, key_file_password, password, use_password, command)
     elif preset.raas_ssh_library == 'PARAMIKO':
-        return _paramiko_ssh(server, username, key_file, key_file_password, password, use_password, use_password_2fa, command)
+        return _paramiko_ssh(server, username, key_file, key_file_password, password, use_password, command)
     else:
         return await _ssh_async(key_file if not use_password else None, server, username, command)
 
@@ -1324,12 +1222,11 @@ def ssh_command_sync(server, command, preset):
     key_file_password = preset.raas_private_key_password
     password = preset.raas_da_password
     use_password = preset.raas_da_use_password
-    use_password_2fa = preset.raas_use_2FA
     
     if preset.raas_ssh_library == 'ASYNCSSH':
-        return _asyncssh_ssh(server, username, key_file, key_file_password, password, use_password, use_password_2fa, command)
+        return _asyncssh_ssh(server, username, key_file, key_file_password, password, use_password, command)
     elif preset.raas_ssh_library == 'PARAMIKO':
-        return _paramiko_ssh(server, username, key_file, key_file_password, password, use_password, use_password_2fa, command)
+        return _paramiko_ssh(server, username, key_file, key_file_password, password, use_password, command)
     else:
         return _ssh_sync(key_file if not use_password else None, server, username, command)
     
@@ -1344,12 +1241,11 @@ async def ssh_command_jump(server1, server2, command, preset):
     key_file_password = preset.raas_private_key_password
     password = preset.raas_da_password
     use_password = preset.raas_da_use_password
-    use_password_2fa = preset.raas_use_2FA
     
     if preset.raas_ssh_library == 'ASYNCSSH':
-        return await _asyncssh_ssh_jump_async(server1, server2, username, key_file, key_file_password, password, use_password, use_password_2fa, command)
+        return await _asyncssh_ssh_jump_async(server1, server2, username, key_file, key_file_password, password, use_password, command)
     elif preset.raas_ssh_library == 'PARAMIKO':
-        return _paramiko_ssh_jump(server1, server2, username, key_file, key_file_password, password, use_password, use_password_2fa, command)
+        return _paramiko_ssh_jump(server1, server2, username, key_file, key_file_password, password, use_password, command)
     else:
         return await _ssh_async_jump(key_file if not use_password else None, server1, server2, username, command)
 
@@ -1363,12 +1259,11 @@ def ssh_command_sync_jump(server1, server2, command, preset):
     key_file_password = preset.raas_private_key_password
     password = preset.raas_da_password
     use_password = preset.raas_da_use_password
-    use_password_2fa = preset.raas_use_2FA
     
     if preset.raas_ssh_library == 'ASYNCSSH':
-        return _asyncssh_ssh_jump(server1, server2, username, key_file, key_file_password, password, use_password, use_password_2fa, command)
+        return _asyncssh_ssh_jump(server1, server2, username, key_file, key_file_password, password, use_password, command)
     elif preset.raas_ssh_library == 'PARAMIKO':
-        return _paramiko_ssh_jump(server1, server2, username, key_file, key_file_password, password, use_password, use_password_2fa, command)
+        return _paramiko_ssh_jump(server1, server2, username, key_file, key_file_password, password, use_password, command)
     else:
         return _ssh_async_jump(key_file if not use_password else None, server1, server2, username, command)
                   
@@ -1416,12 +1311,12 @@ async def _scp_async(key_file, source, destination):
             else:
                 raise Exception("scp command failed: %s -> %s" % (source, destination))
 
-async def _asyncssh_put_async(server, username, key_file, key_file_password, password, use_password, use_password_2fa, source, destination):
+async def _asyncssh_put_async(server, username, key_file, key_file_password, password, use_password, source, destination):
         """ Execute an asyncssh file upload (put) - async version """
 
         import asyncssh
 
-        bpy.context.scene.raas_session.show_dialog(server, username, key_file, key_file_password, password, use_password, use_password_2fa, client_type='ASYNCSSH')
+        bpy.context.scene.raas_session.show_dialog(server, username, key_file, key_file_password, password, use_password, client_type='ASYNCSSH')
 
         try:
             # Get the SSH connection from the session
@@ -1437,7 +1332,7 @@ async def _asyncssh_put_async(server, username, key_file, key_file_password, pas
         except Exception as e:
             raise Exception("asyncssh put command failed: %s: %s" % (e.__class__, e))
 
-def _asyncssh_put(server, username, key_file, key_file_password, password, use_password, use_password_2fa, source, destination):
+def _asyncssh_put(server, username, key_file, key_file_password, password, use_password, source, destination):
         """ Execute an asyncssh file upload (put) - sync wrapper """
 
         import asyncio
@@ -1447,21 +1342,21 @@ def _asyncssh_put(server, username, key_file, key_file_password, password, use_p
             loop = asyncio.get_event_loop()
             if loop.is_running():
                 raise RuntimeError("Cannot call sync version from async context")
-            loop.run_until_complete(_asyncssh_put_async(server, username, key_file, key_file_password, password, use_password, use_password_2fa, source, destination))
+            loop.run_until_complete(_asyncssh_put_async(server, username, key_file, key_file_password, password, use_password, source, destination))
         except RuntimeError:
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
             try:
-                loop.run_until_complete(_asyncssh_put_async(server, username, key_file, key_file_password, password, use_password, use_password_2fa, source, destination))
+                loop.run_until_complete(_asyncssh_put_async(server, username, key_file, key_file_password, password, use_password, source, destination))
             finally:
                 loop.close()
 
-async def _asyncssh_get_async(server, username, key_file, key_file_password, password, use_password, use_password_2fa, source, destination):
+async def _asyncssh_get_async(server, username, key_file, key_file_password, password, use_password, source, destination):
         """ Execute an asyncssh file download (get) - async version """
 
         import asyncssh
 
-        bpy.context.scene.raas_session.show_dialog(server, username, key_file, key_file_password, password, use_password, use_password_2fa, client_type='ASYNCSSH')
+        bpy.context.scene.raas_session.show_dialog(server, username, key_file, key_file_password, password, use_password, client_type='ASYNCSSH')
 
         try:
             # Get the SSH connection from the session
@@ -1477,7 +1372,7 @@ async def _asyncssh_get_async(server, username, key_file, key_file_password, pas
         except Exception as e:
             raise Exception("asyncssh get command failed: %s: %s" % (e.__class__, e))
 
-def _asyncssh_get(server, username, key_file, key_file_password, password, use_password, use_password_2fa, source, destination):
+def _asyncssh_get(server, username, key_file, key_file_password, password, use_password, source, destination):
         """ Execute an asyncssh file download (get) - sync wrapper """
 
         import asyncio
@@ -1487,16 +1382,16 @@ def _asyncssh_get(server, username, key_file, key_file_password, password, use_p
             loop = asyncio.get_event_loop()
             if loop.is_running():
                 raise RuntimeError("Cannot call sync version from async context")
-            loop.run_until_complete(_asyncssh_get_async(server, username, key_file, key_file_password, password, use_password, use_password_2fa, source, destination))
+            loop.run_until_complete(_asyncssh_get_async(server, username, key_file, key_file_password, password, use_password, source, destination))
         except RuntimeError:
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
             try:
-                loop.run_until_complete(_asyncssh_get_async(server, username, key_file, key_file_password, password, use_password, use_password_2fa, source, destination))
+                loop.run_until_complete(_asyncssh_get_async(server, username, key_file, key_file_password, password, use_password, source, destination))
             finally:
                 loop.close()
 
-def _paramiko_put(server, username, key_file, key_file_password, password, use_password, use_password_2fa, source, destination):
+def _paramiko_put(server, username, key_file, key_file_password, password, use_password, source, destination):
         """ Execute an paramiko command """
 
         import paramiko
@@ -1504,7 +1399,7 @@ def _paramiko_put(server, username, key_file, key_file_password, password, use_p
         from base64 import b64decode
         from scp import SCPClient
 
-        bpy.context.scene.raas_session.show_dialog(server, username, key_file, key_file_password, password, use_password, use_password_2fa, client_type='PARAMIKO')
+        bpy.context.scene.raas_session.show_dialog(server, username, key_file, key_file_password, password, use_password, client_type='PARAMIKO')
 
         ssh = None
         scp = None
@@ -1529,7 +1424,7 @@ def _paramiko_put(server, username, key_file, key_file_password, password, use_p
             raise Exception("paramiko command failed:  %s: %s" % (e.__class__, e))
 
 
-def _paramiko_get(server, username, key_file, key_file_password, password, use_password, use_password_2fa, source, destination):
+def _paramiko_get(server, username, key_file, key_file_password, password, use_password, source, destination):
         """ Execute an paramiko command """
 
         import paramiko
@@ -1537,7 +1432,7 @@ def _paramiko_get(server, username, key_file, key_file_password, password, use_p
         from base64 import b64decode
         from scp import SCPClient
 
-        bpy.context.scene.raas_session.show_dialog(server, username, key_file, key_file_password, password, use_password, use_password_2fa, client_type='PARAMIKO')
+        bpy.context.scene.raas_session.show_dialog(server, username, key_file, key_file_password, password, use_password, client_type='PARAMIKO')
 
         ssh = None
         scp = None
@@ -1619,7 +1514,6 @@ async def transfer_files(context, fileTransfer, job_local_dir: str, job_remote_d
     key_file_password = preset.raas_private_key_password
     password = preset.raas_da_password
     use_password = preset.raas_da_use_password
-    use_password_2fa = preset.raas_use_2FA
 
     # check job_local_dir
     if to_cluster == False:
@@ -1631,24 +1525,24 @@ async def transfer_files(context, fileTransfer, job_local_dir: str, job_remote_d
             source = job_local_dir
             destination = '%s/%s' % (str(sharedBasepath), job_remote_dir)
             print('copy from %s to server' % (job_local_dir))
-            await _asyncssh_put_async(serverHostname, username, key_file, key_file_password, password, use_password, use_password_2fa, source, destination)
+            await _asyncssh_put_async(serverHostname, username, key_file, key_file_password, password, use_password, source, destination)
         else:
             destination = job_local_dir
             source = '%s/%s' % (str(sharedBasepath), job_remote_dir)
             print('copy from server to: %s' % (job_local_dir))
-            await _asyncssh_get_async(serverHostname, username, key_file, key_file_password, password, use_password, use_password_2fa, source, destination)
+            await _asyncssh_get_async(serverHostname, username, key_file, key_file_password, password, use_password, source, destination)
     elif preset.raas_ssh_library == 'PARAMIKO':
         session = bpy.context.scene.raas_session
         ssh = session.paramiko_get_ssh(serverHostname)
         if ssh is None or not session.is_alive(serverHostname, client_type='PARAMIKO'):
             try:
-                session.show_dialog(serverHostname, username, key_file, key_file_password, password, use_password, use_password_2fa, client_type='PARAMIKO')
+                session.show_dialog(serverHostname, username, key_file, key_file_password, password, use_password, client_type='PARAMIKO')
             except Exception as e:
                 import paramiko
                 if isinstance(e.__cause__, paramiko.AuthenticationException) or "AuthenticationException" in str(e):
                     session.close(serverHostname, client_type='PARAMIKO')
                     bpy.ops.wm.raas_password_input('INVOKE_DEFAULT')
-                    raise Exception("SSH authentication failed. Re-enter your SSH password or 2FA code, then try the download again.")
+                    raise Exception("SSH authentication failed. Re-enter your SSH password, then try the download again.")
                 raise
             ssh = session.paramiko_get_ssh(serverHostname)
         if ssh is None:

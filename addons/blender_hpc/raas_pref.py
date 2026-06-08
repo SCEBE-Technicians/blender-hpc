@@ -39,7 +39,7 @@ from . import raas_server
 from . import raas_config
 from . import raas_connection
 
-ADDON_NAME = 'braas_hpc'
+ADDON_NAME = 'blender_hpc'
 DEPENDENCIES_PATH = bpy.utils.user_resource(
     'SCRIPTS', path=os.path.join(ADDON_NAME, "dependencies"), create=True)
 
@@ -351,7 +351,7 @@ def cluster_partition_settings_callback(self, context):
 class ClusterPresets(bpy.types.PropertyGroup):
     """
         A property group of cluster presets. Each presets has the following properties:
-        cluster_name, partition_name (queue), allocation_name, is_enabled, working_dir.
+        cluster_name, partition_name (queue), is_enabled, working_dir.
     """
 
     cluster_name: bpy.props.EnumProperty(
@@ -364,12 +364,6 @@ class ClusterPresets(bpy.types.PropertyGroup):
         name="Partition/Queue",
         description="Select a partition/queue",
         items=cluster_partition_settings_callback
-    )  # type: ignore
-
-    allocation_name: bpy.props.StringProperty(
-        name="Project",
-        description="Project allocation name",
-        default="local"
     )  # type: ignore
 
     job_type: bpy.props.EnumProperty(
@@ -418,11 +412,6 @@ class ClusterPresets(bpy.types.PropertyGroup):
         subtype='PASSWORD'
     )  # type: ignore
 
-    raas_use_2FA: bpy.props.BoolProperty(
-        name="Use 2FA",
-        default=False
-    )  # type: ignore
-
     raas_ssh_library: EnumProperty(
         name='SSH Library',
         items=raas_config.ssh_library_items
@@ -448,7 +437,7 @@ class RAAS_OT_find_working_dir(Operator):
                     self.report({'ERROR'}, message)
                     return {"CANCELLED"}
 
-                if (preset.allocation_name != "" or preset.cluster_name == "SCEBE") and len(preset.working_dir) == 0:
+                if len(preset.working_dir) == 0:
                     context.scene.raas_config_functions.call_set_pid_dir(preset)  # sets the working_dir in the preset
                     message = "Find working dir for %s: %s" % (preset.cluster_name, preset.working_dir)
                     log.info(message)
@@ -458,11 +447,6 @@ class RAAS_OT_find_working_dir(Operator):
                                                                                       preset.working_dir)
                     log.info(message)
                     self.report({'INFO'}, message)
-                else:
-                    message = "Find working dir for %s skipped: allocation name is empty" % preset.cluster_name
-                    log.info(message)
-                    self.report({'INFO'}, message)
-
                 # # Test connection
 
         except Exception as e:
@@ -564,7 +548,7 @@ class RaasPreferences(AddonPreferences):
 
     raas_pid_name: StringProperty(
         name='Project ID',
-        description='Computing resource allocated by the project allocation committee to the primary investigator, e.g. OPEN-XX-XX, DD-XX-XX',
+        description='Project identifier, e.g. OPEN-XX-XX, DD-XX-XX',
         default=''
     )  # type: ignore
 
@@ -597,11 +581,6 @@ class RaasPreferences(AddonPreferences):
     #     default=True
 
     #     name='SSH Library',
-
-    raas_account_type: EnumProperty(
-        name='Account Type',
-        items=raas_config.account_types_items
-    )  # type: ignore
 
     raas_project_group: StringProperty(
         name='Working Group',
@@ -760,7 +739,7 @@ class RaasPreferences(AddonPreferences):
         pid_box.operator("pref.newcluster", icon="ADD")
 
         for idx, preset in enumerate(self.cluster_presets):
-            if preset.working_dir == '' or (preset.allocation_name == '' and preset.cluster_name != "SCEBE"):
+            if preset.working_dir == '':
                 preset.is_enabled = False
             box_row = box.box()
             raas_pid = box_row.split(**factor(1.0), align=True)
@@ -779,12 +758,6 @@ class RaasPreferences(AddonPreferences):
             rep_box = rep_box1.row(align=True)
             rep_box.prop(preset, 'raas_da_use_password', text='')
 
-            rep_split = box_row.split(**factor(0.25), align=True)
-            rep_split.label(text='Use 2FA:')
-            rep_box1 = rep_split.row(align=True)
-            rep_box = rep_box1.row(align=True)
-            rep_box.prop(preset, 'raas_use_2FA', text='')
-
             if preset.raas_da_use_password:
                 pid_box.prop(preset, "raas_da_password")
             else:
@@ -797,7 +770,6 @@ class RaasPreferences(AddonPreferences):
 
             raas_pid = box_row.split(**factor(1.0), align=True)
             pid_box = raas_pid.column(align=True)
-            pid_box.prop(preset, "allocation_name")
             pid_box.prop(preset, "working_dir", text='Dir')
             pid_box.prop(preset, "is_enabled")
             pid_box.operator("pref.removecluster", icon="CANCEL").index = idx

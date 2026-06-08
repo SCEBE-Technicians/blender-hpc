@@ -1,8 +1,8 @@
-﻿# BRaaS-HPC ENU Rendering Add-on
+# blender-hpc ENU Rendering Add-on
 
 A Blender add-on for submitting Cycles render jobs to Edinburgh Napier University HPC resources, including ENUCC and the SCEBE GPU server.
 
-This project is a fork of the original [BRaaS-HPC](https://github.com/It4innovations/braas-hpc) project from IT4Innovations. The fork adapts the add-on for direct SSH-based rendering workflows on Edinburgh Napier University infrastructure, with bundled Slurm scripts for ENUCC and `scebe-gpu-server`.
+This project is a fork of the original [brass-hpc](https://github.com/It4innovations/blender-hpc) project from IT4Innovations. The fork adapts the add-on for direct SSH-based rendering workflows on Edinburgh Napier University infrastructure, with bundled Slurm scripts for ENUCC and `scebe-gpu-server`.
 
 ## What It Does
 
@@ -82,7 +82,7 @@ The remote system needs:
 - SSH access for your user account.
 - Slurm commands available, such as `sbatch`, `squeue`, and `scancel`.
 - Blender installed at `~/blender/blender`, or installed through the add-on setup workflow.
-- The render helper scripts installed under `~/braas-hpc/scripts/...`.
+- The render helper scripts installed under `~/blender-hpc/scripts/...`.
 - A writable working directory, usually under your home directory or project storage.
 
 For SCEBE, Slurm accounting may be disabled, so the add-on uses `squeue` and local `.job` files rather than relying on `sacct`.
@@ -115,19 +115,19 @@ Do not zip the whole repository unless the top-level folder inside the zip is `b
 2. Go to `Edit > Preferences > Add-ons`.
 3. Click `Install...`.
 4. Select `braas_hpc.zip`.
-5. Enable `System: BRaaS-HPC`.
+5. Enable `System: blender-hpc`.
 
 ### 3. Install Dependencies
 
 In the add-on preferences:
 
-1. Expand `BRaaS-HPC`.
+1. Expand `blender-hpc`.
 2. Click `Install Dependencies`.
 3. Restart Blender if prompted.
 
 ### 4. Configure A Cluster Preset
 
-In `Edit > Preferences > Add-ons > BRaaS-HPC`:
+In `Edit > Preferences > Add-ons > blender-hpc`:
 
 1. Add a cluster preset.
 2. Select the cluster, for example `SCEBE GPU Server` or `ENUCC`.
@@ -152,8 +152,8 @@ In the add-on preferences:
 Expected remote script paths:
 
 ```text
-~/braas-hpc/scripts/scebe-gpu-server-slurm/
-~/braas-hpc/scripts/enucc-slurm/
+~/blender-hpc/scripts/scebe-gpu-server-slurm/
+~/blender-hpc/scripts/enucc-slurm/
 ~/blender/blender
 ```
 
@@ -164,7 +164,7 @@ Expected remote script paths:
 1. Open your Blender scene.
 2. Set render engine to `Cycles`.
 3. Open the `Render Properties` tab.
-4. Expand `BRaaS-HPC`.
+4. Expand `blender-hpc`.
 
 ### 2. Configure The Job
 
@@ -292,8 +292,8 @@ If `sacct` fails, this is expected on direct Slurm targets where accounting is u
 Check the remote job files:
 
 ```bash
-ls -la ~/braas-hpc/direct/<username>/scebe/*.job
-cat ~/braas-hpc/direct/<username>/scebe/*.job
+ls -la ~/blender-hpc/direct/<username>/scebe/*.job
+cat ~/blender-hpc/direct/<username>/scebe/*.job
 ```
 
 For ENUCC, replace `scebe` with `enucc`.
@@ -321,16 +321,16 @@ doc/                               Additional documentation
 
 ## Fork Notice
 
-This repository is a fork of BRaaS-HPC. The original project was developed by IT4Innovations National Supercomputing Center.
+This repository is a fork of blender-hpc. The original project was developed by IT4Innovations National Supercomputing Center.
 
 Original project:
 
 ```text
-https://github.com/It4innovations/braas-hpc
+https://github.com/It4innovations/blender-hpc
 ```
 
 This fork is adapted for Edinburgh Napier University HPC rendering workflows.
 
 ## License
 
-This project follows the license of the original BRaaS-HPC project. See [LICENSE](LICENSE).
+This project follows the license of the original blender-hpc project. See [LICENSE](LICENSE).

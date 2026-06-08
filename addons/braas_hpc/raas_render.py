@@ -84,7 +84,7 @@ class RaasButtonsPanel:
 
 
 class RAAS_PT_simplify(RaasButtonsPanel, Panel):
-    bl_label = "BRaaS-HPC"
+    bl_label = "blender-hpc"
     bl_options = {'DEFAULT_CLOSED'}
 
     def draw(self, context):
@@ -121,10 +121,10 @@ class RAAS_PT_simplify(RaasButtonsPanel, Panel):
             if preset.raas_ssh_library == 'ASYNCSSH' or preset.raas_ssh_library == 'PARAMIKO':
                 if len(preset.raas_da_username) == 0 \
                         or not pref.raas_scripts_installed or len(pref.cluster_presets) < 1:
-                    box.label(text='BRaaS-HPC is not set in preferences', icon='ERROR')
+                    box.label(text='blender-hpc is not set in preferences', icon='ERROR')
             else:
                 if len(pref.cluster_presets) < 1 or not pref.raas_scripts_installed:
-                    box.label(text='BRaaS-HPC is not set in preferences', icon='ERROR')
+                    box.label(text='blender-hpc is not set in preferences', icon='ERROR')
 
         if not pref.dependencies_installed:
             box.label(text='Dependencies are not installed', icon='ERROR')
@@ -508,7 +508,7 @@ async def submit_job_save_blendfile(context, outdir):
             for layer in context.scene.view_layers:
                 layer.cycles.use_denoising = False
 
-        filepath = Path(context.blend_data.filepath).with_suffix('.braas-hpc.blend')
+        filepath = Path(context.blend_data.filepath).with_suffix('.blender-hpc.blend')
 
         # Step 1: First save the file
         bpy.ops.wm.save_as_mainfile(filepath=str(filepath),
@@ -599,7 +599,7 @@ class RAAS_OT_submit_job(
             # it's dirty, but we do need a filename and a location.
             if context.scene.raas_blender_job_info_new.file_type == 'DEFAULT':
                 if not os.path.exists(context.blend_data.filepath):
-                    self.report({'ERROR'}, 'Please save your Blend file before using the braas-hpc addon.')
+                    self.report({'ERROR'}, 'Please save your Blend file before using the blender-hpc addon.')
                     context.window_manager.raas_status = "ERROR"
                     context.window_manager.raas_status_txt = "There is an error! Check Info Editor!"
 

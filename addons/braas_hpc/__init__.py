@@ -14,13 +14,13 @@
 # (c) IT4Innovations, VSB-TUO
 
 bl_info = {
-    "name" : "BRaaS-HPC",
-    "author" : "Milan Jaros, Petr Strakos, Marta Jaros, Lubomir Riha",
+    "name" : "blender-hpc",
+    "author" : "Alexander Hallard",
     "description" : "Rendering-as-a-service for Blender on HPC",
     "blender" : (4, 0, 0),
-    "version" : (4, 5, 5),
+    "version" : (1, 0, 0),
     "location" : "Addon Preferences panel",
-    "wiki_url" : "https://github.com/It4innovations/braas-hpc/",
+    "wiki_url" : "https://scebe-technicians.github.io/enucc-tutorials/software/blender/",
     "category" : "System",
 }
 
@@ -57,7 +57,7 @@ def register():
     """Late-loads and registers the Blender-dependent submodules."""
 
     log_path = _setup_file_logging()
-    log.info("BRaaS-HPC logging to %s", log_path)
+    log.info("blender-hpc logging to %s", log_path)
 
     from . import async_loop
     from . import raas_pref

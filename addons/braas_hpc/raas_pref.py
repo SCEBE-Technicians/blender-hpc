@@ -61,7 +61,7 @@ def factor(factor: float) -> dict:
 ##################################################
 
 
-def show_message_box(message="", title="BRaaS-HPC", icon='INFO'):
+def show_message_box(message="", title="blender-hpc", icon='INFO'):
     def draw(self, context):
         self.layout.label(text=message)
 
@@ -905,7 +905,7 @@ def get_selected_cluster_preset(context):
 
     if index < 0 or index >= len(prefs.cluster_presets):
         raise ValueError(
-            "No valid HPC configuration is selected. Select the SCEBE preset in the BRaaS-HPC panel."
+            "No valid HPC configuration is selected. Select the SCEBE preset in the blender-hpc panel."
         )
 
     return prefs.cluster_presets[index]

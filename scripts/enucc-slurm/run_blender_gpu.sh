@@ -23,7 +23,7 @@ if [ ${#work_dir} -ge 1  ]; then
   cd job
 
   if [ ${frame_start} == ${FRAME}  ]; then  
-    squeue -j ${SLURM_JOBID} -h -o "%i %j %T %V %S %e" > ${work_dir}.job || true
+    squeue -j ${SLURM_JOBID} -h -o "%i %j %T %V %S %e %M" > ${work_dir}.job || true
   fi  
 fi
 ###############################################

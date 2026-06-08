@@ -30,11 +30,12 @@ mkdir -p ${CACHE_DIR}
 ###############################################
 if [ ${#work_dir} -ge 1  ]; then
   JOB_ID=${depends_on##* }
-  squeue -j ${JOB_ID} -h -o "%i %j %T %V %S %e" > ${work_dir}.job || true
+  squeue -j ${JOB_ID} -h -o "%i %j %T %V %S %e %M" > ${work_dir}.job || true
   if [ ! -s ${work_dir}.job ]; then
-    echo "${JOB_ID} ${job_project} COMPLETED unknown unknown unknown" > ${work_dir}.job
+    sacct -j ${JOB_ID} -X -n -o "JobIDRaw,JobName,State,Submit,Start,End,Elapsed" | awk 'NF {print; exit}' > ${work_dir}.job || true
+  fi
+  if [ ! -s ${work_dir}.job ]; then
+    echo "${JOB_ID} ${job_project} COMPLETED unknown unknown unknown unknown" > ${work_dir}.job
   fi
 fi
 ###############################################
-
-

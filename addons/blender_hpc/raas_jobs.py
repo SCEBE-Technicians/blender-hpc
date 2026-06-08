@@ -462,7 +462,7 @@ def CmdCreateStatSLURMJobFile(context, slurm_jobs):
             # These direct Slurm targets use squeue-generated job files. The
             # finish script writes the final COMPLETED state when squeue no
             # longer sees the job.
-            cmd = cmd + 'squeue -j ' + slurm_job + ' -h -o "%i %j %T %V %S %e" > ' + job_log + ' || true;'
+            cmd = cmd + 'squeue -j ' + slurm_job + ' -h -o "%i %j %T %V %S %e %M" > ' + job_log + ' || true;'
         else:
             # grep -v omits logging of such as slurmID.batch tasks
             cmd = cmd + 'sacct -j ' + slurm_job + ' --format=JobID%20,Jobname%50,state,Submit,start,end | grep -v "\\." > ' \
@@ -711,7 +711,7 @@ def slurm_process_job_entry(lines, job_name, elements, slurm_id_parts, cluster_t
         return slurm_process_job_array(lines, job_name, elements, cluster_type, job_type, job_index)
     
     # Check for regular job entries
-    if (len(slurm_id_parts) == 1 and len(elements) == 7 and
+    if (len(slurm_id_parts) == 1 and len(elements) >= 7 and
         "JobID" not in elements[1] and "----" not in elements[1]):
         return slurm_process_regular_job(job_name, elements, cluster_type, job_type, job_index), 1
     

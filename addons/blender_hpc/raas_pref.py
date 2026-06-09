@@ -535,6 +535,11 @@ class RaasPreferences(AddonPreferences):
         default=False
     )  # type: ignore
 
+    show_advanced_preferences: BoolProperty(
+        name='Advanced',
+        default=False
+    )  # type: ignore
+
     #     name='RaaS Server',
     #     default=''
 
@@ -733,6 +738,23 @@ class RaasPreferences(AddonPreferences):
 
     def draw(self, context):
         layout = self.layout
+
+        setup_box = layout.box()
+        setup_box.label(text='Setup:')
+        setup_box.operator('raas.setup_wizard', icon='PREFERENCES')
+
+        advanced_row = layout.row(align=True)
+        advanced_row.prop(
+            self,
+            'show_advanced_preferences',
+            icon='TRIA_DOWN' if self.show_advanced_preferences else 'TRIA_RIGHT',
+            emboss=False
+        )
+        if not self.show_advanced_preferences:
+            return
+
+        layout = layout.box()
+        layout.label(text='Advanced preferences:')
 
         box = layout.box()
 

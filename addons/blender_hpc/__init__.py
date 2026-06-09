@@ -60,12 +60,14 @@ def register():
     log.info("blender-hpc logging to %s", log_path)
 
     from . import async_loop
+    from . import raas_setup
     from . import raas_pref
     from . import raas_render
 
     async_loop.setup_asyncio_executor()
     async_loop.register()
 
+    raas_setup.register()
     raas_pref.register()
     raas_render.register()    
 
@@ -73,13 +75,14 @@ def unregister():
     """unregister."""
 
     from . import async_loop
+    from . import raas_setup
     from . import raas_pref
     from . import raas_render
     
     try:
         async_loop.unregister()
-        raas_pref.unregister()
         raas_render.unregister() 
+        raas_pref.unregister()
+        raas_setup.unregister()
     except RuntimeError:
         pass
-

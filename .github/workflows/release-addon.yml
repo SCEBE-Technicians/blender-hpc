@@ -1,0 +1,33 @@
+name: Release Blender Addon
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Zip addon
+        run: |
+          cd addons
+          zip -r ../blender-hpc.zip blender_hpc
+
+      - name: Create/update release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="main-latest"
+
+          gh release view "$TAG" >/dev/null 2>&1 || \
+            gh release create "$TAG" \
+              --title "Latest main build" \
+              --notes "Automatically built from main."
+
+          gh release upload "$TAG" blender-hpc.zip --clobber

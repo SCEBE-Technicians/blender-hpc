@@ -126,15 +126,6 @@ def ensure_async_loop():
     log.debug("Result of starting modal operator is %r", result)
 
 
-def erase_async_loop():
-    global _loop_kicking_operator_running
-
-    log.debug("Erasing async loop")
-
-    loop = asyncio.get_event_loop()
-    loop.stop()
-
-
 class AsyncLoopModalOperator(bpy.types.Operator):
     bl_idname = "asyncio.loop"
     bl_label = "Runs the asyncio main loop"

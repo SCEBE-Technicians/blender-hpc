@@ -1193,31 +1193,6 @@ async def SubmitJob(context, token):
             res = await raas_connection.ssh_command(server, cmd, preset)
 
 
-async def CancelJob(context, token):
-    idx = context.scene.raas_list_jobs_index
-    item = context.scene.raas_list_jobs[idx]
-
-    preset = raas_pref.get_selected_cluster_preset(context)
-
-    server = context.scene.raas_config_functions.call_get_da_server(context)
-    remote_path = raas_connection.get_direct_access_remote_storage(context)
-    cmd = 'cat %s/%s.job | grep Id' % (remote_path, item.Name)
-    res = await raas_connection.ssh_command(server, cmd, preset)
-    if len(res) < 3:
-        raise Exception("ssh command failed: %s" % cmd)
-
-    jobs = res.split('\n')
-    for job in jobs:
-        if len(job) > 0:
-            job_id = job.split(': ')[1]
-            cmd = 'qdel -W force %s' % (job_id)
-            res = await raas_connection.ssh_command(server, cmd, preset)
-
-    cmd = "sed -i 's/job_state = R/job_state = C/g' %s/%s.job;sed -i 's/job_state = Q/job_state = C/g' %s/%s.job;echo '   ' ftime = $(date) >> %s/%s.job" % (
-        remote_path, item.Name, remote_path, item.Name, remote_path, item.Name)
-    res = await raas_connection.ssh_command(server, cmd, preset)
-
-
 async def CancelSlurmJob(context, token):
     from datetime import datetime
 

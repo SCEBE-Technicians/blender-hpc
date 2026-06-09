@@ -3,6 +3,8 @@ name: Release Blender Addon
 on:
   push:
     branches: [main]
+    paths:
+      - 'addons/blender_hpc/**'
 
 permissions:
   contents: write

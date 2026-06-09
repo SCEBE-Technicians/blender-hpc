@@ -596,14 +596,6 @@ class RaasPreferences(AddonPreferences):
 
     #     name='SSH Library',
 
-    raas_project_group: StringProperty(
-        name='Working Group',
-        default=''
-    )  # type: ignore
-
-    #     name='Username',
-    #     default=''
-
     #     name='Key Passphrase',
     #     default='',
     #     subtype='PASSWORD'
@@ -806,11 +798,6 @@ class RaasPreferences(AddonPreferences):
         props = path_box.operator(
             'raas.explore_file_path', text='', icon='DISK_DRIVE')
         props.path = self.raas_job_storage_path
-
-        raas_pgroup = box.split(**factor(0.25), align=True)
-        raas_pgroup.label(text='Working Group:')
-        pgroup_box = raas_pgroup.row(align=True)
-        pgroup_box.prop(self, 'raas_project_group', text='')
 
         boxD = layout.box()
         boxD.label(text='Blender dependencies:')

@@ -166,33 +166,10 @@ def get_blendfile_fullpath(context):
         + context.scene.raas_blender_job_info_new.blendfile
     return path
 
-def get_project_group(context):
-    pref = raas_pref.preferences()
-    project_group = pref.raas_project_group
-    if len(project_group) == 0:
-        try:
-            preset = raas_pref.get_selected_cluster_preset(context)
-            project_group = preset.raas_da_username
-        except ValueError:
-            project_group = ''
-
-    if len(project_group) == 0:
-        import getpass        
-        project_group = getpass.getuser()
-
-    if len(pref.raas_project_group) == 0:
-        pref.raas_project_group = project_group
-
-    return project_group
-
 def get_direct_access_remote_storage(context):
-    project_group = get_project_group(context)
-
     pid_name, pid_queue, pid_dir = context.scene.raas_config_functions.call_get_current_pid_info(context, raas_pref.preferences())
 
-    path = context.scene.raas_config_functions.call_get_da_cluster_path(context, pid_dir, pid_name.lower())
-
-    return path + '/' + project_group + '/' + context.scene.raas_blender_job_info_new.cluster_type.lower()
+    return context.scene.raas_config_functions.call_get_da_cluster_path(context, pid_dir, pid_name.lower())
 
 def CmdCreateProjectGroupFolder(context):
     cmd = 'mkdir -p ' + get_direct_access_remote_storage(context)

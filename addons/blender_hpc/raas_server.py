@@ -30,7 +30,8 @@ import bpy
 
 log = logging.getLogger(__name__)
 
-#@functools.lru_cache(maxsize=None)
+
+# @functools.lru_cache(maxsize=None)
 def get_endpoint(endpoint_path=None):
     """Gets the endpoint for the authentication API. If the BHRAAS_SERVER_ENDPOINT env variable
     is defined, it's possible to override the (default) production address.
@@ -40,7 +41,8 @@ def get_endpoint(endpoint_path=None):
     import urllib.parse
     import functools
 
-    pid_name, pid_queue, pid_dir = bpy.context.scene.raas_config_functions.call_get_current_pid_info(bpy.context, raas_pref.preferences())
+    pid_name, pid_queue, pid_dir = bpy.context.scene.raas_config_functions.call_get_current_pid_info(bpy.context,
+                                                                                                     raas_pref.preferences())
     base_url = raas_config.GetServer(pid_name.lower())
 
     # urljoin() is None-safe for the 2nd parameter.
@@ -52,30 +54,30 @@ async def post_json(endpoint, data_json):
 
     print('Sending request to: %s' % url)
     raas_client = requests.session()
-    response = raas_client.request('POST', url, data = data_json, headers={'Content-Type': 'application/json'})    
+    response = raas_client.request('POST', url, data=data_json, headers={'Content-Type': 'application/json'})
 
     if 200 > response.status_code or 299 < response.status_code:
         raise Exception('Http post error: text: %s, status: %d, url: %s' % (response.text, response.status_code, url))
 
     return response.text
 
+
 async def post(endpoint, data):
-    
-    data_json = json_dumps(data)  
+    data_json = json_dumps(data)
     resp = await post_json(endpoint, data_json)
     try:
-        resp_json = json.loads(resp) #.decode('utf-8')
+        resp_json = json.loads(resp)  # .decode('utf-8')
     except json.JSONDecodeError:
-        raise Exception('JSONDecodeError: {}'.format(resp)) #.decode('utf-8')
+        raise Exception('JSONDecodeError: {}'.format(resp))  # .decode('utf-8')
 
     return resp_json
 
-async def get_token(username: str, password: str) -> str:
 
+async def get_token(username: str, password: str) -> str:
     data = {
-        "Credentials" : {
-            "Username" : username,
-            "Password" : password,
+        "Credentials": {
+            "Username": username,
+            "Password": password,
         }
     }
 
@@ -84,33 +86,34 @@ async def get_token(username: str, password: str) -> str:
 
     data_json = json_dumps(data)
     resp = await post_json("UserAndLimitationManagement/AuthenticateUserPassword", data_json)
-    
+
     if resp is None or len(resp) != 38:
         raise Exception('username or password is wrong')
 
-    
-    return resp.replace('"','') #.decode('utf-8')     
+    return resp.replace('"', '')  # .decode('utf-8')
+
 
 local_to_server_map = {
-    "Id" : "Id",
-    "Name" : "Name",
-    "State" : "State",
-    "Priority" : "Priority",
-    "Project" : "Project",
-    "CreationTime" : "CreationTime",
-    "SubmitTime" : "SubmitTime",
-    "StartTime" : "StartTime",
-    "EndTime" : "EndTime",
-    "TotalAllocatedTime" : "TotalAllocatedTime",
-    "AllParameters" : "AllParameters",
+    "Id": "Id",
+    "Name": "Name",
+    "State": "State",
+    "Priority": "Priority",
+    "Project": "Project",
+    "CreationTime": "CreationTime",
+    "SubmitTime": "SubmitTime",
+    "StartTime": "StartTime",
+    "EndTime": "EndTime",
+    "TotalAllocatedTime": "TotalAllocatedTime",
+    "AllParameters": "AllParameters",
     "Tasks": "Tasks",
 
     "Credentials": "Credentials",
     "PrivateKey": "PrivateKey",
     "ServerHostname": "ServerHostname",
     "SharedBasepath": "SharedBasepath",
-    "UserName":  "Username"
+    "UserName": "Username"
 }
+
 
 def fill_items(dest, src):
     for item in dest.__dir__():
@@ -120,6 +123,7 @@ def fill_items(dest, src):
             dest[item] = src[local_to_server_map[item]]
         else:
             dest[item] = None
+
 
 def json_dumps(data):
     return json.dumps(data, separators=(',', ':'))

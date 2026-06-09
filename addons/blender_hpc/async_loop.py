@@ -55,10 +55,10 @@ def setup_asyncio_executor():
     loop.set_default_executor(executor)
     # loop.set_debug(True)
 
-
     # Python 3.8 deprecated the 'loop' parameter, 3.10 removed it.
 
     # No more than this many Pillar calls should be made simultaneously
+
 
 def kick_async_loop(*args) -> bool:
     """Performs a single iteration of the asyncio event loop.
@@ -251,7 +251,7 @@ class AsyncModalOperatorMixin:
                     ex,
                     exc_info=(type(ex), ex, ex.__traceback__),
                 )
-                
+
                 context.window_manager.raas_status = "ERROR"
                 context.window_manager.raas_status_txt = "Exception while running task: %s" % ex
 
@@ -273,7 +273,7 @@ class AsyncModalOperatorMixin:
         context.window_manager.event_timer_remove(self.timer)
 
     def _new_async_task(
-        self, async_task: typing.Coroutine, future: asyncio.Future = None
+            self, async_task: typing.Coroutine, future: asyncio.Future = None
     ):
         """Stops the currently running async task, and starts another one."""
 

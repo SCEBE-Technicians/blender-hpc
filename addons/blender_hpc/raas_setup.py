@@ -8,7 +8,6 @@ from . import raas_pref
 from . import raas_config
 from . import raas_connection
 
-
 log = logging.getLogger(__name__)
 
 Page_items = [

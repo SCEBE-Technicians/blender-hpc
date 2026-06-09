@@ -17,7 +17,6 @@
 # ##### END GPL LICENSE BLOCK #####
 
 
-
 import functools
 import logging
 import tempfile
@@ -41,7 +40,6 @@ import time
 
 import bpy
 
-
 from . import async_loop
 from . import raas_server
 from . import raas_pref
@@ -52,6 +50,7 @@ import pathlib
 import json
 
 log = logging.getLogger(__name__)
+
 
 #############################################################################
 def is_verbose_debug():
@@ -115,65 +114,81 @@ def get_ssh_key_file():
     ssh_key_local = Path(tempfile.gettempdir()) / 'server_key'
     return ssh_key_local
 
+
 def get_cluster_presets():
     presets = []  # to be returned in EnumProperty
     for preset in raas_pref.preferences().cluster_presets:
         presets.append(('%s, %s' % (preset.cluster_name, preset.partition_name), '', ''))
     return presets
 
+
 def get_pref_storage_dir():
     pref = raas_pref.preferences()
     return pref.raas_job_storage_path
 
+
 def get_job_local_storage(job_name):
     local_storage = Path(get_pref_storage_dir()) / job_name
-    return local_storage     
+    return local_storage
+
 
 def get_job_local_storage_in(job_name):
     local_storage_in = Path(get_pref_storage_dir()) / job_name / 'in'
-    return local_storage_in    
+    return local_storage_in
+
 
 def get_job_local_storage_out(job_name):
     local_storage_out = Path(get_pref_storage_dir()) / job_name / 'out'
-    return local_storage_out  
+    return local_storage_out
+
 
 def get_job_local_storage_log(job_name):
     local_storage_log = Path(get_pref_storage_dir()) / job_name / 'log'
-    return local_storage_log   
+    return local_storage_log
+
 
 def get_job_remote_storage_in(job_name):
     remote_storage_in = Path('in')
-    return remote_storage_in   
+    return remote_storage_in
+
 
 def get_job_remote_storage(job_name):
     remote_storage_out = Path('.')
     return remote_storage_out
 
+
 def get_job_remote_storage_out(job_name):
     remote_storage_out = Path('out')
     return remote_storage_out
+
 
 def get_job_remote_storage_log(job_name):
     remote_storage_log = Path('log')
     return remote_storage_log
 
-def convert_path_to_linux(path)->str:
+
+def convert_path_to_linux(path) -> str:
     p = str(path)
-    return p.replace("\\","/")
+    return p.replace("\\", "/")
+
 
 def get_blendfile_fullpath(context):
     path = bpy.path.abspath(context.scene.raas_blender_job_info_new.blendfile_dir) + '/' \
-        + context.scene.raas_blender_job_info_new.blendfile
+           + context.scene.raas_blender_job_info_new.blendfile
     return path
 
+
 def get_direct_access_remote_storage(context):
-    pid_name, pid_queue, pid_dir = context.scene.raas_config_functions.call_get_current_pid_info(context, raas_pref.preferences())
+    pid_name, pid_queue, pid_dir = context.scene.raas_config_functions.call_get_current_pid_info(context,
+                                                                                                 raas_pref.preferences())
 
     return context.scene.raas_config_functions.call_get_da_cluster_path(context, pid_dir, pid_name.lower())
+
 
 def CmdCreateProjectGroupFolder(context):
     cmd = 'mkdir -p ' + get_direct_access_remote_storage(context)
     return cmd
+
 
 ############################################################################
 class SSHProcess:
@@ -181,14 +196,15 @@ class SSHProcess:
     Base class for SSH process management using native OpenSSH.
     Handles process lifecycle, monitoring, and automatic restart.
     """
+
     def __init__(
-        self,
-        user_host: str,
-        identity_file: str | None = None,
-        auto_restart: bool = True,
-        check_interval_sec: float = 5.0,
-        ssh_path: str | None = None,
-        extra_ssh_opts: list[str] | None = None
+            self,
+            user_host: str,
+            identity_file: str | None = None,
+            auto_restart: bool = True,
+            check_interval_sec: float = 5.0,
+            ssh_path: str | None = None,
+            extra_ssh_opts: list[str] | None = None
     ):
         self.user_host = user_host
         self.identity_file = identity_file
@@ -227,7 +243,7 @@ class SSHProcess:
                         print(f"SSH process output before termination:\nSTDOUT: {out}\nSTDERR: {err}")
                 except subprocess.TimeoutExpired:
                     pass
-            
+
             # attempt graceful shutdown
             self._proc.terminate()
             try:
@@ -264,7 +280,7 @@ class SSHProcess:
             creationflags=creationflags,
             text=True
         )
-        
+
         if is_verbose_debug():
             print(f"SSH process started with PID: {self._proc.pid}")
 
@@ -334,6 +350,7 @@ class SSHProcess:
     def __del__(self):
         self.stop()
 
+
 class SSHCommand(SSHProcess):
     """
     SSH command execution using native OpenSSH.
@@ -341,17 +358,18 @@ class SSHCommand(SSHProcess):
     - Capture stdout/stderr
     - Support for long-running commands (infinite loops)
     """
+
     def __init__(
-        self,
-        user_host: str,                 # e.g. "user@remote-host"
-        local_port: int,
-        remote_host: str,
-        remote_port: int,        
-        command: str,                   # command to execute
-        identity_file: str | None = None,
-        ssh_path: str | None = None,    # path to ssh binary, default is found in PATH
-        extra_ssh_opts: list[str] | None = None,
-        auto_restart: bool = False      # Auto-restart for long-running commands
+            self,
+            user_host: str,  # e.g. "user@remote-host"
+            local_port: int,
+            remote_host: str,
+            remote_port: int,
+            command: str,  # command to execute
+            identity_file: str | None = None,
+            ssh_path: str | None = None,  # path to ssh binary, default is found in PATH
+            extra_ssh_opts: list[str] | None = None,
+            auto_restart: bool = False  # Auto-restart for long-running commands
     ):
         super().__init__(
             user_host=user_host,
@@ -373,7 +391,7 @@ class SSHCommand(SSHProcess):
     def _build_cmd(self) -> list[str]:
         cmd = [
             self.ssh_path,
-            "-T",                     # no TTY
+            "-T",  # no TTY
             "-o", "StrictHostKeyChecking=no",  # auto-accept host keys
             "-o", "UserKnownHostsFile=/dev/null",  # don't save host keys
             "-o", "ServerAliveInterval=20",
@@ -408,7 +426,7 @@ class SSHCommand(SSHProcess):
             Tuple of (stdout, stderr, returncode)
         """
         self._start_process()
-        
+
         try:
             stdout, stderr = self._proc.communicate(timeout=timeout)
             self._stdout = stdout
@@ -419,7 +437,7 @@ class SSHCommand(SSHProcess):
             raise TimeoutError(f"SSH command timed out after {timeout}s")
         finally:
             self._proc = None
-        
+
         return self._stdout, self._stderr, self._returncode
 
     @property
@@ -436,7 +454,7 @@ class SSHCommand(SSHProcess):
     def returncode(self) -> int | None:
         """Get return code from last execution."""
         return self._returncode
-    
+
     def is_running(self) -> bool:
         """Check if the SSH command process is currently running."""
         return self._is_healthy()
@@ -449,29 +467,30 @@ class SSHCommandJump(SSHCommand):
     - Support for long-running commands (infinite loops)
     - Automatic ProxyJump configuration
     """
+
     def __init__(
-        self,
-        user_host: str,                 # e.g. "user@remote-host" (final destination)
-        jump_host: str,                 # e.g. "user@jump-host" (intermediate host)
-        local_port: int,
-        remote_port: int,
-        command: str,                   # command to execute
-        identity_file: str | None = None,
-        ssh_path: str | None = None,
-        extra_ssh_opts: list[str] | None = None,
-        auto_restart: bool = False
+            self,
+            user_host: str,  # e.g. "user@remote-host" (final destination)
+            jump_host: str,  # e.g. "user@jump-host" (intermediate host)
+            local_port: int,
+            remote_port: int,
+            command: str,  # command to execute
+            identity_file: str | None = None,
+            ssh_path: str | None = None,
+            extra_ssh_opts: list[str] | None = None,
+            auto_restart: bool = False
     ):
         # Don't call super().__init__ yet, we need to set jump_host first
         self.jump_host = jump_host
         self.local_port = int(local_port)
         self.remote_port = int(remote_port)
-        
+
         # Now call parent constructor
         super().__init__(
             user_host=user_host,
             local_port=local_port,
             remote_host="localhost",
-            remote_port=remote_port,          
+            remote_port=remote_port,
             command=command,
             identity_file=identity_file,
             ssh_path=ssh_path,
@@ -483,8 +502,8 @@ class SSHCommandJump(SSHCommand):
         """Build SSH command with ProxyJump."""
         cmd = [
             self.ssh_path,
-            "-T",                     # no TTY
-            "-J", self.jump_host,     # ProxyJump through jump host
+            "-T",  # no TTY
+            "-J", self.jump_host,  # ProxyJump through jump host
             "-o", "StrictHostKeyChecking=no",  # auto-accept host keys
             "-o", "UserKnownHostsFile=/dev/null",  # don't save host keys
             "-o", "ServerAliveInterval=20",
@@ -501,9 +520,11 @@ class SSHCommandJump(SSHCommand):
         cmd.append(self.user_host)
         # Wrap command in bash -c to properly handle shell metacharacters
         cmd.append(self.command)
-        return cmd        
+        return cmd
 
-#############################################################################
+    #############################################################################
+
+
 class RaasSession:
     def __init__(self):
         self.paramiko_ssh_clients = {}  # Paramiko SSH clients
@@ -514,7 +535,7 @@ class RaasSession:
         self.username = None
         self.key_file = None
         self.key_file_password = None
-        self.password = None 
+        self.password = None
         self.use_password = None
         self.ssh_command_proc = None
         self.ssh_command_jump_proc = None
@@ -523,14 +544,14 @@ class RaasSession:
         """Check if SSH connection is alive for a specific server (supports both Paramiko and AsyncSSH)"""
         if server is None:
             server = self.server
-        
+
         if client_type is None:
             client_type = self.ssh_client_type
-            
+
         if client_type == 'PARAMIKO':
             if server not in self.paramiko_ssh_clients:
                 return False
-                
+
             ssh_client = self.paramiko_ssh_clients[server]
             if ssh_client is None:
                 return False
@@ -543,25 +564,25 @@ class RaasSession:
         elif client_type == 'ASYNCSSH':
             if server not in self.asyncssh_ssh_clients:
                 return False
-                
+
             ssh_client = self.asyncssh_ssh_clients[server]
             if ssh_client is None:
                 return False
-            
+
             # AsyncSSH connection check
             return not ssh_client.is_closed()
         else:
             return False
-    
+
     def paramiko_is_alive(self, server=None):
         """Check if Paramiko SSH connection is alive for a specific server (legacy method)"""
         return self.is_alive(server, client_type='PARAMIKO')
-    
+
     def close(self, server=None, client_type=None):
         """Close SSH connection for a specific server or all servers (supports both Paramiko and AsyncSSH)"""
         if client_type is None:
             client_type = self.ssh_client_type
-            
+
         if client_type == 'PARAMIKO':
             if server is None:
                 # Close all connections
@@ -590,7 +611,7 @@ class RaasSession:
                     if ssh_client is not None:
                         ssh_client.close()
                     del self.asyncssh_ssh_clients[server]
-    
+
     def paramiko_close(self, server=None):
         """Close Paramiko SSH connection for a specific server or all servers (legacy method)"""
         self.close(server, client_type='PARAMIKO')
@@ -599,34 +620,34 @@ class RaasSession:
         """Get SSH client for a specific server (supports both Paramiko and AsyncSSH)"""
         if server is None:
             server = self.server
-        
+
         if client_type is None:
             client_type = self.ssh_client_type
-            
+
         if client_type == 'PARAMIKO':
             return self.paramiko_ssh_clients.get(server)
         elif client_type == 'ASYNCSSH':
             return self.asyncssh_ssh_clients.get(server)
         else:
             return None
-    
+
     def set_ssh(self, ssh, server=None, client_type=None):
         """Set SSH client for a specific server (supports both Paramiko and AsyncSSH)"""
         if server is None:
             server = self.server
-        
+
         if client_type is None:
             client_type = self.ssh_client_type
-            
+
         if client_type == 'PARAMIKO':
             self.paramiko_ssh_clients[server] = ssh
         elif client_type == 'ASYNCSSH':
             self.asyncssh_ssh_clients[server] = ssh
-    
+
     def paramiko_get_ssh(self, server=None):
         """Get Paramiko SSH client for a specific server (legacy method)"""
         return self.get_ssh(server, client_type='PARAMIKO')
-    
+
     def paramiko_set_ssh(self, ssh, server=None):
         """Set Paramiko SSH client for a specific server (legacy method)"""
         self.set_ssh(ssh, server, client_type='PARAMIKO')
@@ -643,9 +664,9 @@ class RaasSession:
                 self.password = password
             else:
                 self.key_file_password = password
- 
+
         ssh = None
-        try: 
+        try:
             ssh = paramiko.SSHClient()
             ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
             ssh.load_system_host_keys()
@@ -655,11 +676,11 @@ class RaasSession:
                 ssh.connect(
                     hostname=self.server,
                     username=self.username,
-                    password=self.password,   # <-- instead of pkey
-                    look_for_keys=False,      # don’t try ~/.ssh/id_rsa
-                    allow_agent=False         # don’t use ssh-agent
-                )                
-            else:                
+                    password=self.password,  # <-- instead of pkey
+                    look_for_keys=False,  # don’t try ~/.ssh/id_rsa
+                    allow_agent=False  # don’t use ssh-agent
+                )
+            else:
                 key = paramiko_load_private_key(self.key_file, self.key_file_password)
 
                 ssh.connect(
@@ -679,20 +700,20 @@ class RaasSession:
             self.paramiko_ssh_clients[self.server] = None
 
             if ssh is not None:
-                ssh.close()           
+                ssh.close()
 
             raise Exception("paramiko ssh command failed:  %s: %s" % (e.__class__, e))
-    
+
     async def asyncssh_create_session(self, password):
         """Create AsyncSSH session."""
         import asyncssh
-        
+
         if not password is None:
             if self.use_password:
                 self.password = password
             else:
                 self.key_file_password = password
- 
+
         ssh = None
         try:
             # Load client keys if needed
@@ -706,7 +727,7 @@ class RaasSession:
                         client_keys = [key]
                 except Exception as e:
                     raise Exception(f"Failed to load SSH key: {e}")
-            
+
             # Connect to server
             if self.use_password:
                 ssh = await asyncssh.connect(
@@ -723,7 +744,7 @@ class RaasSession:
                     client_keys=client_keys,
                     known_hosts=None
                 )
-            
+
             # Store the SSH client in the dict with server as key
             self.asyncssh_ssh_clients[self.server] = ssh
 
@@ -734,12 +755,12 @@ class RaasSession:
                 ssh.close()
 
             raise Exception("asyncssh ssh command failed:  %s: %s" % (e.__class__, e))
-        
+
     def show_dialog(self, server, username, key_file, key_file_password, password, use_password, client_type=None):
         """Show password dialog and create SSH session (supports both Paramiko and AsyncSSH)"""
         if client_type is None:
             client_type = self.ssh_client_type
-        
+
         if not self.is_alive(server, client_type):
             self.close(server, client_type)
 
@@ -840,6 +861,7 @@ class RaasSession:
             self.ssh_command_jump_proc.stop()
             self.ssh_command_jump_proc = None
 
+
 ##################################################################################
 ##################################################################################    
 async def _ssh_async(key_file, server, username, command):
@@ -848,7 +870,7 @@ async def _ssh_async(key_file, server, username, command):
     if username is None:
         user_server = '%s' % (server)
     else:
-        user_server = '%s@%s' % (username, server)        
+        user_server = '%s@%s' % (username, server)
 
     if key_file is None:
         cmd = [
@@ -859,18 +881,17 @@ async def _ssh_async(key_file, server, username, command):
     else:
         cmd = [
             'ssh',
-            '-i',  key_file,
+            '-i', key_file,
             '-o', 'BatchMode=yes',
             '-o', 'PasswordAuthentication=no',
             user_server, command
         ]
 
-        
     import asyncio
     process = await asyncio.create_subprocess_exec(
-        *cmd, 
+        *cmd,
         stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE)        
+        stderr=asyncio.subprocess.PIPE)
 
     stdout, stderr = await process.communicate()
 
@@ -878,11 +899,12 @@ async def _ssh_async(key_file, server, username, command):
         if stdout:
             print(f'[stdout]\n{stdout.decode()}')
         if stderr:
-            print(f'[stderr]\n{stderr.decode()}')        
+            print(f'[stderr]\n{stderr.decode()}')
 
         raise Exception("ssh command failed: %s" % cmd)
 
     return str(stdout.decode())
+
 
 async def _ssh_async_jump(key_file, server1, server2, username, command):
     """ Execute an ssh command through a jump host (server1 -> server2) using ProxyJump """
@@ -936,13 +958,14 @@ async def _ssh_async_jump(key_file, server1, server2, username, command):
 
     return str(stdout.decode())
 
+
 def _ssh_sync(key_file, server, username, command):
     """ Execute an ssh command """
 
     if username is None:
         user_server = '%s' % (server)
     else:
-        user_server = '%s@%s' % (username, server)        
+        user_server = '%s@%s' % (username, server)
 
     if key_file is None:
         cmd = [
@@ -955,7 +978,7 @@ def _ssh_sync(key_file, server, username, command):
     else:
         cmd = [
             'ssh',
-            '-i',  key_file,
+            '-i', key_file,
             '-o', 'BatchMode=yes',
             '-o', 'PasswordAuthentication=no',
             '-o', 'StrictHostKeyChecking=no',
@@ -971,246 +994,263 @@ def _ssh_sync(key_file, server, username, command):
         if stdout:
             print(str(stdout.decode()))
         if stderr:
-            print(str(stderr.decode()))        
+            print(str(stderr.decode()))
 
         raise Exception("ssh command failed: %s" % cmd)
 
-    return str(stdout.decode())  
+    return str(stdout.decode())
+
 
 async def _asyncssh_ssh_async(server, username, key_file, key_file_password, password, use_password, command):
-        """ Execute an asyncssh ssh command (async version) """
+    """ Execute an asyncssh ssh command (async version) """
 
-        import asyncssh
+    import asyncssh
 
-        bpy.context.scene.raas_session.show_dialog(server, username, key_file, key_file_password, password, use_password, client_type='ASYNCSSH')
+    bpy.context.scene.raas_session.show_dialog(server, username, key_file, key_file_password, password, use_password,
+                                               client_type='ASYNCSSH')
 
-        try:
-            # Get the SSH connection from the session
-            conn = bpy.context.scene.raas_session.get_ssh(server, client_type='ASYNCSSH')
-            
-            if conn is None:
-                raise Exception("AsyncSSH connection not available")
+    try:
+        # Get the SSH connection from the session
+        conn = bpy.context.scene.raas_session.get_ssh(server, client_type='ASYNCSSH')
 
-            # Execute command
-            result = await conn.run(command, check=False)
-            
-            if result.exit_status != 0 and result.stderr:
-                error_lines = result.stderr.strip().split('\n')
-                if len(error_lines) > 1 or 'load bsc' not in error_lines[0]:
-                    raise Exception(result.stderr)
+        if conn is None:
+            raise Exception("AsyncSSH connection not available")
 
-            return result.stdout
+        # Execute command
+        result = await conn.run(command, check=False)
 
-        except Exception as e:
-            raise Exception("asyncssh ssh command failed: %s: %s" % (e.__class__, e))
+        if result.exit_status != 0 and result.stderr:
+            error_lines = result.stderr.strip().split('\n')
+            if len(error_lines) > 1 or 'load bsc' not in error_lines[0]:
+                raise Exception(result.stderr)
+
+        return result.stdout
+
+    except Exception as e:
+        raise Exception("asyncssh ssh command failed: %s: %s" % (e.__class__, e))
+
 
 def _asyncssh_ssh(server, username, key_file, key_file_password, password, use_password, command):
-        """ Execute an asyncssh ssh command (sync wrapper) """
+    """ Execute an asyncssh ssh command (sync wrapper) """
 
-        import asyncio
+    import asyncio
 
-        # Use existing event loop if available, otherwise create new one
+    # Use existing event loop if available, otherwise create new one
+    try:
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            # If loop is already running (in Blender context), we can't use run_until_complete
+            # This should not happen if called from sync context
+            raise RuntimeError("Cannot call sync version from async context")
+        result = loop.run_until_complete(
+            _asyncssh_ssh_async(server, username, key_file, key_file_password, password, use_password, command))
+    except RuntimeError:
+        # Create new event loop
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
         try:
-            loop = asyncio.get_event_loop()
-            if loop.is_running():
-                # If loop is already running (in Blender context), we can't use run_until_complete
-                # This should not happen if called from sync context
-                raise RuntimeError("Cannot call sync version from async context")
-            result = loop.run_until_complete(_asyncssh_ssh_async(server, username, key_file, key_file_password, password, use_password, command))
-        except RuntimeError:
-            # Create new event loop
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            try:
-                result = loop.run_until_complete(_asyncssh_ssh_async(server, username, key_file, key_file_password, password, use_password, command))
-            finally:
-                loop.close()
+            result = loop.run_until_complete(
+                _asyncssh_ssh_async(server, username, key_file, key_file_password, password, use_password, command))
+        finally:
+            loop.close()
 
-        return result
+    return result
+
 
 def _paramiko_ssh(server, username, key_file, key_file_password, password, use_password, command):
-        """ Execute an paramiko ssh command """
+    """ Execute an paramiko ssh command """
 
-        import paramiko
+    import paramiko
 
-        bpy.context.scene.raas_session.show_dialog(server, username, key_file, key_file_password, password, use_password, client_type='PARAMIKO')
+    bpy.context.scene.raas_session.show_dialog(server, username, key_file, key_file_password, password, use_password,
+                                               client_type='PARAMIKO')
 
-        result = None
-        try: 
+    result = None
+    try:
 
-            #ssh.connect(server, username=username, pkey=key)
-            ssh = bpy.context.scene.raas_session.paramiko_get_ssh(server)
-            stdin, stdout, stderr = ssh.exec_command(command)
-            result = stdout.readlines()
-            error = stderr.readlines()            
+        # ssh.connect(server, username=username, pkey=key)
+        ssh = bpy.context.scene.raas_session.paramiko_get_ssh(server)
+        stdin, stdout, stderr = ssh.exec_command(command)
+        result = stdout.readlines()
+        error = stderr.readlines()
 
-            if len(error) > 0 and (len(error) > 1 or 'load bsc' not in error[0]):
-                raise Exception(str(error))
+        if len(error) > 0 and (len(error) > 1 or 'load bsc' not in error[0]):
+            raise Exception(str(error))
 
-            #ssh.close()    
+        # ssh.close()
 
-        except Exception as e:
-            #     scp.close()
+    except Exception as e:
+        #     scp.close()
 
-            #     ssh.close()
+        #     ssh.close()
 
-            raise Exception("paramiko ssh command failed:  %s: %s" % (e.__class__, e))    
+        raise Exception("paramiko ssh command failed:  %s: %s" % (e.__class__, e))
 
-        return ''.join(result)
+    return ''.join(result)
 
-async def _asyncssh_ssh_jump_async(server1, server2, username, key_file, key_file_password, password, use_password, command):
-        """ Execute an asyncssh ssh command through a jump host (async version) """
 
+async def _asyncssh_ssh_jump_async(server1, server2, username, key_file, key_file_password, password, use_password,
+                                   command):
+    """ Execute an asyncssh ssh command through a jump host (async version) """
+
+    import asyncssh
+
+    bpy.context.scene.raas_session.show_dialog(server1, username, key_file, key_file_password, password, use_password,
+                                               client_type='ASYNCSSH')
+
+    try:
+        # Get the SSH connection to the jump host from the session
+        jump_conn = bpy.context.scene.raas_session.get_ssh(server1, client_type='ASYNCSSH')
+
+        if jump_conn is None:
+            raise Exception("AsyncSSH connection to jump host not available")
+
+        # Connect to target server (server2) through jump host
+        # Note: We need to recreate the connection through the jump host each time
+        # since AsyncSSH doesn't maintain persistent connections like Paramiko channels
         import asyncssh
 
-        bpy.context.scene.raas_session.show_dialog(server1, username, key_file, key_file_password, password, use_password, client_type='ASYNCSSH')
+        # Load client keys if needed
+        client_keys = []
+        if not use_password and key_file:
+            try:
+                if key_file_password:
+                    client_keys = [asyncssh.read_private_key(key_file, passphrase=key_file_password)]
+                else:
+                    client_keys = [asyncssh.read_private_key(key_file)]
+            except Exception as e:
+                raise Exception(f"Failed to load SSH key: {e}")
 
-        try:
-            # Get the SSH connection to the jump host from the session
-            jump_conn = bpy.context.scene.raas_session.get_ssh(server1, client_type='ASYNCSSH')
-            
-            if jump_conn is None:
-                raise Exception("AsyncSSH connection to jump host not available")
+        if use_password:
+            target_conn = await jump_conn.connect_ssh(
+                server2,
+                username=username,
+                password=password,
+                known_hosts=None
+            )
+        else:
+            target_conn = await jump_conn.connect_ssh(
+                server2,
+                username=username,
+                client_keys=client_keys,
+                known_hosts=None
+            )
 
-            # Connect to target server (server2) through jump host
-            # Note: We need to recreate the connection through the jump host each time
-            # since AsyncSSH doesn't maintain persistent connections like Paramiko channels
-            import asyncssh
-            
-            # Load client keys if needed
-            client_keys = []
-            if not use_password and key_file:
-                try:
-                    if key_file_password:
-                        client_keys = [asyncssh.read_private_key(key_file, passphrase=key_file_password)]
-                    else:
-                        client_keys = [asyncssh.read_private_key(key_file)]
-                except Exception as e:
-                    raise Exception(f"Failed to load SSH key: {e}")
-            
-            if use_password:
-                target_conn = await jump_conn.connect_ssh(
-                    server2,
-                    username=username,
-                    password=password,
-                    known_hosts=None
-                )
-            else:
-                target_conn = await jump_conn.connect_ssh(
-                    server2,
-                    username=username,
-                    client_keys=client_keys,
-                    known_hosts=None
-                )
+        # Execute command on target server
+        result = await target_conn.run(command, check=False)
 
-            # Execute command on target server
-            result = await target_conn.run(command, check=False)
-            
-            if result.exit_status != 0 and result.stderr:
-                error_lines = result.stderr.strip().split('\n')
-                if len(error_lines) > 1 or 'load bsc' not in error_lines[0]:
-                    target_conn.close()
-                    raise Exception(result.stderr)
+        if result.exit_status != 0 and result.stderr:
+            error_lines = result.stderr.strip().split('\n')
+            if len(error_lines) > 1 or 'load bsc' not in error_lines[0]:
+                target_conn.close()
+                raise Exception(result.stderr)
 
-            target_conn.close()
-            return result.stdout
+        target_conn.close()
+        return result.stdout
 
-        except Exception as e:
-            raise Exception("asyncssh ssh jump command failed: %s: %s" % (e.__class__, e))
+    except Exception as e:
+        raise Exception("asyncssh ssh jump command failed: %s: %s" % (e.__class__, e))
+
 
 def _asyncssh_ssh_jump(server1, server2, username, key_file, key_file_password, password, use_password, command):
-        """ Execute an asyncssh ssh command through a jump host (sync wrapper) """
+    """ Execute an asyncssh ssh command through a jump host (sync wrapper) """
 
-        import asyncio
+    import asyncio
 
-        # Use existing event loop if available, otherwise create new one
+    # Use existing event loop if available, otherwise create new one
+    try:
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            # If loop is already running (in Blender context), we can't use run_until_complete
+            raise RuntimeError("Cannot call sync version from async context")
+        result = loop.run_until_complete(
+            _asyncssh_ssh_jump_async(server1, server2, username, key_file, key_file_password, password, use_password,
+                                     command))
+    except RuntimeError:
+        # Create new event loop
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
         try:
-            loop = asyncio.get_event_loop()
-            if loop.is_running():
-                # If loop is already running (in Blender context), we can't use run_until_complete
-                raise RuntimeError("Cannot call sync version from async context")
-            result = loop.run_until_complete(_asyncssh_ssh_jump_async(server1, server2, username, key_file, key_file_password, password, use_password, command))
-        except RuntimeError:
-            # Create new event loop
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            try:
-                result = loop.run_until_complete(_asyncssh_ssh_jump_async(server1, server2, username, key_file, key_file_password, password, use_password, command))
-            finally:
-                loop.close()
+            result = loop.run_until_complete(
+                _asyncssh_ssh_jump_async(server1, server2, username, key_file, key_file_password, password,
+                                         use_password, command))
+        finally:
+            loop.close()
 
-        return result
+    return result
+
 
 def _paramiko_ssh_jump(server1, server2, username, key_file, key_file_password, password, use_password, command):
-        """ Execute an paramiko ssh command through a jump host (server1 -> server2) """
+    """ Execute an paramiko ssh command through a jump host (server1 -> server2) """
 
-        import paramiko
+    import paramiko
 
-        bpy.context.scene.raas_session.show_dialog(server1, username, key_file, key_file_password, password, use_password, client_type='PARAMIKO')
+    bpy.context.scene.raas_session.show_dialog(server1, username, key_file, key_file_password, password, use_password,
+                                               client_type='PARAMIKO')
 
-        result = None
-        ssh_jump = None
-        ssh_target = None
-        
-        try:
-            # Get the SSH connection to the jump host (server1)
-            ssh_jump = bpy.context.scene.raas_session.paramiko_get_ssh(server1)
-            
-            # Create a transport channel through the jump host to server2
-            jump_transport = ssh_jump.get_transport()
-            dest_addr = (server2, 22)
-            local_addr = ('127.0.0.1', 0)
-            jump_channel = jump_transport.open_channel("direct-tcpip", dest_addr, local_addr)
-            
-            # Create a new SSH client for the target server (server2)
-            ssh_target = paramiko.SSHClient()
-            ssh_target.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-            
-            # Load the key for authentication to server2
-            if use_password:
-                ssh_target.connect(server2, username=username, password=password, sock=jump_channel)
-            else:
-                key = paramiko_load_private_key(key_file, key_file_password)
-                
-                ssh_target.connect(
-                    server2,
-                    username=username,
-                    pkey=key,
-                    sock=jump_channel,
-                    look_for_keys=False,
-                    allow_agent=False,
-                )
-            
-            # Execute the command on server2
-            stdin, stdout, stderr = ssh_target.exec_command(command)
-            result = stdout.readlines()
-            error = stderr.readlines()
-            
-            if len(error) > 0 and (len(error) > 1 or 'load bsc' not in error[0]):
-                raise Exception(str(error))
-            
-            # Close the target connection
+    result = None
+    ssh_jump = None
+    ssh_target = None
+
+    try:
+        # Get the SSH connection to the jump host (server1)
+        ssh_jump = bpy.context.scene.raas_session.paramiko_get_ssh(server1)
+
+        # Create a transport channel through the jump host to server2
+        jump_transport = ssh_jump.get_transport()
+        dest_addr = (server2, 22)
+        local_addr = ('127.0.0.1', 0)
+        jump_channel = jump_transport.open_channel("direct-tcpip", dest_addr, local_addr)
+
+        # Create a new SSH client for the target server (server2)
+        ssh_target = paramiko.SSHClient()
+        ssh_target.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+
+        # Load the key for authentication to server2
+        if use_password:
+            ssh_target.connect(server2, username=username, password=password, sock=jump_channel)
+        else:
+            key = paramiko_load_private_key(key_file, key_file_password)
+
+            ssh_target.connect(
+                server2,
+                username=username,
+                pkey=key,
+                sock=jump_channel,
+                look_for_keys=False,
+                allow_agent=False,
+            )
+
+        # Execute the command on server2
+        stdin, stdout, stderr = ssh_target.exec_command(command)
+        result = stdout.readlines()
+        error = stderr.readlines()
+
+        if len(error) > 0 and (len(error) > 1 or 'load bsc' not in error[0]):
+            raise Exception(str(error))
+
+        # Close the target connection
+        ssh_target.close()
+
+    except Exception as e:
+        if ssh_target is not None:
             ssh_target.close()
-            
-        except Exception as e:
-            if ssh_target is not None:
-                ssh_target.close()
-            
-            raise Exception("paramiko ssh jump command failed: %s: %s" % (e.__class__, e))
-        
-        return ''.join(result)
+
+        raise Exception("paramiko ssh jump command failed: %s: %s" % (e.__class__, e))
+
+    return ''.join(result)
+
 
 async def ssh_command(server, command, preset):
-    if command  is None:
+    if command is None:
         return None
-    
-            
+
     username = preset.raas_da_username
     key_file = get_preset_private_key_file(preset)
     key_file_password = preset.raas_private_key_password
     password = preset.raas_da_password
     use_password = preset.raas_da_use_password
-    
+
     if preset.raas_ssh_library == 'ASYNCSSH':
         return await _asyncssh_ssh_async(server, username, key_file, key_file_password, password, use_password, command)
     elif preset.raas_ssh_library == 'PARAMIKO':
@@ -1218,303 +1258,323 @@ async def ssh_command(server, command, preset):
     else:
         return await _ssh_async(key_file if not use_password else None, server, username, command)
 
+
 def ssh_command_sync(server, command, preset):
-    if command  is None:
+    if command is None:
         return None
-        
-        
+
     username = preset.raas_da_username
     key_file = get_preset_private_key_file(preset)
     key_file_password = preset.raas_private_key_password
     password = preset.raas_da_password
     use_password = preset.raas_da_use_password
-    
+
     if preset.raas_ssh_library == 'ASYNCSSH':
         return _asyncssh_ssh(server, username, key_file, key_file_password, password, use_password, command)
     elif preset.raas_ssh_library == 'PARAMIKO':
         return _paramiko_ssh(server, username, key_file, key_file_password, password, use_password, command)
     else:
         return _ssh_sync(key_file if not use_password else None, server, username, command)
-    
+
 
 async def ssh_command_jump(server1, server2, command, preset):
-    if command  is None:
+    if command is None:
         return None
-    
-            
+
     username = preset.raas_da_username
     key_file = get_preset_private_key_file(preset)
     key_file_password = preset.raas_private_key_password
     password = preset.raas_da_password
     use_password = preset.raas_da_use_password
-    
+
     if preset.raas_ssh_library == 'ASYNCSSH':
-        return await _asyncssh_ssh_jump_async(server1, server2, username, key_file, key_file_password, password, use_password, command)
+        return await _asyncssh_ssh_jump_async(server1, server2, username, key_file, key_file_password, password,
+                                              use_password, command)
     elif preset.raas_ssh_library == 'PARAMIKO':
-        return _paramiko_ssh_jump(server1, server2, username, key_file, key_file_password, password, use_password, command)
+        return _paramiko_ssh_jump(server1, server2, username, key_file, key_file_password, password, use_password,
+                                  command)
     else:
         return await _ssh_async_jump(key_file if not use_password else None, server1, server2, username, command)
 
+
 def ssh_command_sync_jump(server1, server2, command, preset):
-    if command  is None:
+    if command is None:
         return None
-        
-        
+
     username = preset.raas_da_username
     key_file = get_preset_private_key_file(preset)
     key_file_password = preset.raas_private_key_password
     password = preset.raas_da_password
     use_password = preset.raas_da_use_password
-    
+
     if preset.raas_ssh_library == 'ASYNCSSH':
-        return _asyncssh_ssh_jump(server1, server2, username, key_file, key_file_password, password, use_password, command)
+        return _asyncssh_ssh_jump(server1, server2, username, key_file, key_file_password, password, use_password,
+                                  command)
     elif preset.raas_ssh_library == 'PARAMIKO':
-        return _paramiko_ssh_jump(server1, server2, username, key_file, key_file_password, password, use_password, command)
+        return _paramiko_ssh_jump(server1, server2, username, key_file, key_file_password, password, use_password,
+                                  command)
     else:
         return _ssh_async_jump(key_file if not use_password else None, server1, server2, username, command)
-                  
+
+
 ####################################FileTransfer#############################
 
 async def _scp_async(key_file, source, destination):
-        """ Execute an scp command """
+    """ Execute an scp command """
 
-        if key_file is None:
-            cmd = [
-                'scp',
-                '-o', 'StrictHostKeyChecking=no',
-                '-q',
-                '-B',
-                '-r',
-                source, destination
-            ]            
+    if key_file is None:
+        cmd = [
+            'scp',
+            '-o', 'StrictHostKeyChecking=no',
+            '-q',
+            '-B',
+            '-r',
+            source, destination
+        ]
+    else:
+        cmd = [
+            'scp',
+            '-i', key_file,
+            '-o', 'StrictHostKeyChecking=no',
+            '-o', 'PasswordAuthentication=no',
+            '-q',
+            '-B',
+            '-r',
+            source, destination
+        ]
+
+    import asyncio
+    process = await asyncio.create_subprocess_exec(*cmd,
+                                                   stdout=asyncio.subprocess.PIPE,
+                                                   stderr=asyncio.subprocess.PIPE)
+
+    stdout, stderr = await process.communicate()
+
+    if process.returncode != 0:
+        if stdout:
+            print(f'[stdout]\n{stdout.decode()}')
+        if stderr:
+            print(f'[stderr]\n{stderr.decode()}')
+
+        if is_verbose_debug() == True:
+            raise Exception("scp command failed: %s" % cmd)
         else:
-            cmd = [
-                'scp',
-                '-i',  key_file,
-                '-o', 'StrictHostKeyChecking=no',
-                '-o', 'PasswordAuthentication=no',
-                '-q',
-                '-B',
-                '-r',
-                source, destination
-            ]
+            raise Exception("scp command failed: %s -> %s" % (source, destination))
 
-        import asyncio
-        process = await asyncio.create_subprocess_exec(*cmd, 
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE)
 
-        stdout, stderr = await process.communicate()
+async def _asyncssh_put_async(server, username, key_file, key_file_password, password, use_password, source,
+                              destination):
+    """ Execute an asyncssh file upload (put) - async version """
 
-        if process.returncode != 0:
-            if stdout:
-                print(f'[stdout]\n{stdout.decode()}')
-            if stderr:
-                print(f'[stderr]\n{stderr.decode()}')        
+    import asyncssh
 
-            if is_verbose_debug() == True:
-                raise Exception("scp command failed: %s" % cmd)
-            else:
-                raise Exception("scp command failed: %s -> %s" % (source, destination))
+    bpy.context.scene.raas_session.show_dialog(server, username, key_file, key_file_password, password, use_password,
+                                               client_type='ASYNCSSH')
 
-async def _asyncssh_put_async(server, username, key_file, key_file_password, password, use_password, source, destination):
-        """ Execute an asyncssh file upload (put) - async version """
+    try:
+        # Get the SSH connection from the session
+        conn = bpy.context.scene.raas_session.get_ssh(server, client_type='ASYNCSSH')
 
-        import asyncssh
+        if conn is None:
+            raise Exception("AsyncSSH connection not available")
 
-        bpy.context.scene.raas_session.show_dialog(server, username, key_file, key_file_password, password, use_password, client_type='ASYNCSSH')
+        # Upload file(s)
+        async with conn.start_sftp_client() as sftp:
+            await sftp.put(source, destination, recurse=True, preserve=True)
 
-        try:
-            # Get the SSH connection from the session
-            conn = bpy.context.scene.raas_session.get_ssh(server, client_type='ASYNCSSH')
-            
-            if conn is None:
-                raise Exception("AsyncSSH connection not available")
+    except Exception as e:
+        raise Exception("asyncssh put command failed: %s: %s" % (e.__class__, e))
 
-            # Upload file(s)
-            async with conn.start_sftp_client() as sftp:
-                await sftp.put(source, destination, recurse=True, preserve=True)
-
-        except Exception as e:
-            raise Exception("asyncssh put command failed: %s: %s" % (e.__class__, e))
 
 def _asyncssh_put(server, username, key_file, key_file_password, password, use_password, source, destination):
-        """ Execute an asyncssh file upload (put) - sync wrapper """
+    """ Execute an asyncssh file upload (put) - sync wrapper """
 
-        import asyncio
+    import asyncio
 
-        # Use existing event loop if available, otherwise create new one
+    # Use existing event loop if available, otherwise create new one
+    try:
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            raise RuntimeError("Cannot call sync version from async context")
+        loop.run_until_complete(
+            _asyncssh_put_async(server, username, key_file, key_file_password, password, use_password, source,
+                                destination))
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
         try:
-            loop = asyncio.get_event_loop()
-            if loop.is_running():
-                raise RuntimeError("Cannot call sync version from async context")
-            loop.run_until_complete(_asyncssh_put_async(server, username, key_file, key_file_password, password, use_password, source, destination))
-        except RuntimeError:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            try:
-                loop.run_until_complete(_asyncssh_put_async(server, username, key_file, key_file_password, password, use_password, source, destination))
-            finally:
-                loop.close()
+            loop.run_until_complete(
+                _asyncssh_put_async(server, username, key_file, key_file_password, password, use_password, source,
+                                    destination))
+        finally:
+            loop.close()
 
-async def _asyncssh_get_async(server, username, key_file, key_file_password, password, use_password, source, destination):
-        """ Execute an asyncssh file download (get) - async version """
 
-        import asyncssh
+async def _asyncssh_get_async(server, username, key_file, key_file_password, password, use_password, source,
+                              destination):
+    """ Execute an asyncssh file download (get) - async version """
 
-        bpy.context.scene.raas_session.show_dialog(server, username, key_file, key_file_password, password, use_password, client_type='ASYNCSSH')
+    import asyncssh
 
-        try:
-            # Get the SSH connection from the session
-            conn = bpy.context.scene.raas_session.get_ssh(server, client_type='ASYNCSSH')
-            
-            if conn is None:
-                raise Exception("AsyncSSH connection not available")
+    bpy.context.scene.raas_session.show_dialog(server, username, key_file, key_file_password, password, use_password,
+                                               client_type='ASYNCSSH')
 
-            # Download file(s)
-            async with conn.start_sftp_client() as sftp:
-                await sftp.get(source, destination, recurse=True, preserve=True)
+    try:
+        # Get the SSH connection from the session
+        conn = bpy.context.scene.raas_session.get_ssh(server, client_type='ASYNCSSH')
 
-        except Exception as e:
-            raise Exception("asyncssh get command failed: %s: %s" % (e.__class__, e))
+        if conn is None:
+            raise Exception("AsyncSSH connection not available")
+
+        # Download file(s)
+        async with conn.start_sftp_client() as sftp:
+            await sftp.get(source, destination, recurse=True, preserve=True)
+
+    except Exception as e:
+        raise Exception("asyncssh get command failed: %s: %s" % (e.__class__, e))
+
 
 def _asyncssh_get(server, username, key_file, key_file_password, password, use_password, source, destination):
-        """ Execute an asyncssh file download (get) - sync wrapper """
+    """ Execute an asyncssh file download (get) - sync wrapper """
 
-        import asyncio
+    import asyncio
 
-        # Use existing event loop if available, otherwise create new one
+    # Use existing event loop if available, otherwise create new one
+    try:
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            raise RuntimeError("Cannot call sync version from async context")
+        loop.run_until_complete(
+            _asyncssh_get_async(server, username, key_file, key_file_password, password, use_password, source,
+                                destination))
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
         try:
-            loop = asyncio.get_event_loop()
-            if loop.is_running():
-                raise RuntimeError("Cannot call sync version from async context")
-            loop.run_until_complete(_asyncssh_get_async(server, username, key_file, key_file_password, password, use_password, source, destination))
-        except RuntimeError:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            try:
-                loop.run_until_complete(_asyncssh_get_async(server, username, key_file, key_file_password, password, use_password, source, destination))
-            finally:
-                loop.close()
+            loop.run_until_complete(
+                _asyncssh_get_async(server, username, key_file, key_file_password, password, use_password, source,
+                                    destination))
+        finally:
+            loop.close()
+
 
 def _paramiko_put(server, username, key_file, key_file_password, password, use_password, source, destination):
-        """ Execute an paramiko command """
+    """ Execute an paramiko command """
 
-        import paramiko
-        from io import StringIO
-        from base64 import b64decode
-        from scp import SCPClient
+    import paramiko
+    from io import StringIO
+    from base64 import b64decode
+    from scp import SCPClient
 
-        bpy.context.scene.raas_session.show_dialog(server, username, key_file, key_file_password, password, use_password, client_type='PARAMIKO')
+    bpy.context.scene.raas_session.show_dialog(server, username, key_file, key_file_password, password, use_password,
+                                               client_type='PARAMIKO')
 
-        ssh = None
-        scp = None
-        try: 
-            # # if password is None:
-            # # else:
+    ssh = None
+    scp = None
+    try:
+        # # if password is None:
+        # # else:
 
+        # ssh.connect(serverHostname, username=username, pkey=key)
+        ssh = bpy.context.scene.raas_session.paramiko_get_ssh(server)
+        scp = SCPClient(ssh.get_transport())
+        scp.put(source, recursive=True, remote_path=destination)
+        # scp.close()
 
+    except Exception as e:
+        #     scp.close()
 
+        #     ssh.close()
 
-            # ssh.connect(serverHostname, username=username, pkey=key)
-            ssh = bpy.context.scene.raas_session.paramiko_get_ssh(server)
-            scp = SCPClient(ssh.get_transport())
-            scp.put(source, recursive=True, remote_path=destination)       
-            #scp.close()    
-
-        except Exception as e:
-            #     scp.close()
-
-            #     ssh.close()
-
-            raise Exception("paramiko command failed:  %s: %s" % (e.__class__, e))
+        raise Exception("paramiko command failed:  %s: %s" % (e.__class__, e))
 
 
 def _paramiko_get(server, username, key_file, key_file_password, password, use_password, source, destination):
-        """ Execute an paramiko command """
+    """ Execute an paramiko command """
 
-        import paramiko
-        from io import StringIO
-        from base64 import b64decode
-        from scp import SCPClient
+    import paramiko
+    from io import StringIO
+    from base64 import b64decode
+    from scp import SCPClient
 
-        bpy.context.scene.raas_session.show_dialog(server, username, key_file, key_file_password, password, use_password, client_type='PARAMIKO')
+    bpy.context.scene.raas_session.show_dialog(server, username, key_file, key_file_password, password, use_password,
+                                               client_type='PARAMIKO')
 
-        ssh = None
-        scp = None
-        try: 
-            # # if password is None:
-            # # else:
+    ssh = None
+    scp = None
+    try:
+        # # if password is None:
+        # # else:
 
+        # ssh.connect(serverHostname, username=username, pkey=key)
+        ssh = bpy.context.scene.raas_session.paramiko_get_ssh(server)
+        scp = SCPClient(ssh.get_transport())
+        scp.get(source, local_path=destination, recursive=True)
+        # scp.close()
 
-            # ssh.connect(serverHostname, username=username, pkey=key)
-            ssh = bpy.context.scene.raas_session.paramiko_get_ssh(server)
-            scp = SCPClient(ssh.get_transport())
-            scp.get(source, local_path=destination, recursive=True)
-            #scp.close()
+    except Exception as e:
+        #     scp.close()
 
-        except Exception as e:
-            #     scp.close()
+        #     ssh.close()
 
-            #     ssh.close()
-
-            raise Exception("paramiko command failed:  %s: %s" % (e.__class__, e))        
+        raise Exception("paramiko command failed:  %s: %s" % (e.__class__, e))
 
 
 def _paramiko_put_with_client(ssh, source, destination):
-        """Upload files with an existing Paramiko client."""
-        from scp import SCPClient
+    """Upload files with an existing Paramiko client."""
+    from scp import SCPClient
 
-        scp = None
-        try:
-            scp = SCPClient(ssh.get_transport())
-            scp.put(source, recursive=True, remote_path=destination)
-        except Exception as e:
-            raise Exception("paramiko command failed:  %s: %s" % (e.__class__, e))
-        finally:
-            if scp is not None:
-                scp.close()
+    scp = None
+    try:
+        scp = SCPClient(ssh.get_transport())
+        scp.put(source, recursive=True, remote_path=destination)
+    except Exception as e:
+        raise Exception("paramiko command failed:  %s: %s" % (e.__class__, e))
+    finally:
+        if scp is not None:
+            scp.close()
 
 
 def _paramiko_get_with_client(ssh, source, destination):
-        """Download files with an existing Paramiko client."""
-        from scp import SCPClient
+    """Download files with an existing Paramiko client."""
+    from scp import SCPClient
 
-        scp = None
-        try:
-            scp = SCPClient(ssh.get_transport())
-            scp.get(source, local_path=destination, recursive=True)
-        except Exception as e:
-            raise Exception("paramiko command failed:  %s: %s" % (e.__class__, e))
-        finally:
-            if scp is not None:
-                scp.close()
+    scp = None
+    try:
+        scp = SCPClient(ssh.get_transport())
+        scp.get(source, local_path=destination, recursive=True)
+    except Exception as e:
+        raise Exception("paramiko command failed:  %s: %s" % (e.__class__, e))
+    finally:
+        if scp is not None:
+            scp.close()
 
 
 async def start_transfer_files(context, job_id: int, token: str) -> None:
-    """Start Transfer files."""   
+    """Start Transfer files."""
 
     return None
 
 
 async def end_transfer_files(context, fileTransfer, job_id: int, token: str) -> None:
-    """End Transfer files."""    
+    """End Transfer files."""
 
     return None
-  
 
-async def transfer_files(context, fileTransfer, job_local_dir: str, job_remote_dir: str, job_id: int, token: str, to_cluster) -> None:
+
+async def transfer_files(context, fileTransfer, job_local_dir: str, job_remote_dir: str, job_id: int, token: str,
+                         to_cluster) -> None:
     """Transfer files."""
 
     preset = raas_pref.get_selected_cluster_preset(context)
 
     serverHostname = context.scene.raas_config_functions.call_get_da_server(context)
     cmd = CmdCreateProjectGroupFolder(context)
-    
+
     await ssh_command(serverHostname, cmd, preset)
 
-    sharedBasepath = get_direct_access_remote_storage(context)    
-    
+    sharedBasepath = get_direct_access_remote_storage(context)
+
     username = preset.raas_da_username
     key_file = get_preset_private_key_file(preset)
     key_file_password = preset.raas_private_key_password
@@ -1525,30 +1585,34 @@ async def transfer_files(context, fileTransfer, job_local_dir: str, job_remote_d
     if to_cluster == False:
         job_local_dir_check = Path(job_local_dir)
         job_local_dir_check.mkdir(parents=True, exist_ok=True)
-    
+
     if preset.raas_ssh_library == 'ASYNCSSH':
         if to_cluster == True:
             source = job_local_dir
             destination = '%s/%s' % (str(sharedBasepath), job_remote_dir)
             print('copy from %s to server' % (job_local_dir))
-            await _asyncssh_put_async(serverHostname, username, key_file, key_file_password, password, use_password, source, destination)
+            await _asyncssh_put_async(serverHostname, username, key_file, key_file_password, password, use_password,
+                                      source, destination)
         else:
             destination = job_local_dir
             source = '%s/%s' % (str(sharedBasepath), job_remote_dir)
             print('copy from server to: %s' % (job_local_dir))
-            await _asyncssh_get_async(serverHostname, username, key_file, key_file_password, password, use_password, source, destination)
+            await _asyncssh_get_async(serverHostname, username, key_file, key_file_password, password, use_password,
+                                      source, destination)
     elif preset.raas_ssh_library == 'PARAMIKO':
         session = bpy.context.scene.raas_session
         ssh = session.paramiko_get_ssh(serverHostname)
         if ssh is None or not session.is_alive(serverHostname, client_type='PARAMIKO'):
             try:
-                session.show_dialog(serverHostname, username, key_file, key_file_password, password, use_password, client_type='PARAMIKO')
+                session.show_dialog(serverHostname, username, key_file, key_file_password, password, use_password,
+                                    client_type='PARAMIKO')
             except Exception as e:
                 import paramiko
                 if isinstance(e.__cause__, paramiko.AuthenticationException) or "AuthenticationException" in str(e):
                     session.close(serverHostname, client_type='PARAMIKO')
                     bpy.ops.wm.raas_password_input('INVOKE_DEFAULT')
-                    raise Exception("SSH authentication failed. Re-enter your SSH password, then try the download again.")
+                    raise Exception(
+                        "SSH authentication failed. Re-enter your SSH password, then try the download again.")
                 raise
             ssh = session.paramiko_get_ssh(serverHostname)
         if ssh is None:
@@ -1565,7 +1629,7 @@ async def transfer_files(context, fileTransfer, job_local_dir: str, job_remote_d
             print('copy from server to: %s' % (job_local_dir))
             await asyncio.to_thread(_paramiko_get_with_client, ssh, source, destination)
 
-    else:       
+    else:
         user_server = '%s@%s' % (username, serverHostname) if username else serverHostname
         if to_cluster == True:
             source = job_local_dir
@@ -1577,14 +1641,17 @@ async def transfer_files(context, fileTransfer, job_local_dir: str, job_remote_d
             print('copy from server to: %s' % (job_local_dir))
 
         await _scp_async(key_file if not use_password else None, source, destination)
-            
 
-async def transfer_files_to_cluster(context, fileTransfer, job_local_dir: str, job_remote_dir: str, job_id: int, token: str) -> None:
+
+async def transfer_files_to_cluster(context, fileTransfer, job_local_dir: str, job_remote_dir: str, job_id: int,
+                                    token: str) -> None:
     """Transfer files."""
 
     await transfer_files(context, fileTransfer, job_local_dir, job_remote_dir, job_id, token, True)
 
-async def transfer_files_from_cluster(context, fileTransfer, job_remote_dir: str, job_local_dir: str, job_id: int, token: str) -> None:
+
+async def transfer_files_from_cluster(context, fileTransfer, job_remote_dir: str, job_local_dir: str, job_id: int,
+                                      token: str) -> None:
     """Transfer files."""
 
     await transfer_files(context, fileTransfer, job_local_dir, job_remote_dir, job_id, token, False)

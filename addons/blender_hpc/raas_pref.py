@@ -76,7 +76,6 @@ python_dependencies = (Dependency(module="paramiko", package="paramiko", name=No
                        Dependency(module="asyncssh", package="asyncssh", name=None),
                        )
 
-
 internal_dependencies = []
 
 
@@ -181,7 +180,8 @@ class RAAS_OT_install_scripts(Operator):
                             check_cmd = 'test -d ~/blender-hpc/scripts/%s && echo OK' % script_dir
                             res = raas_connection.ssh_command_sync(server, check_cmd, p)
                             if res.strip() != 'OK':
-                                raise Exception("Scripts were not found after install: ~/blender-hpc/scripts/%s" % script_dir)
+                                raise Exception(
+                                    "Scripts were not found after install: ~/blender-hpc/scripts/%s" % script_dir)
 
                         # Install Blender
                         self.report({'INFO'}, "Install Blender on '%s'" % (cl[0]))

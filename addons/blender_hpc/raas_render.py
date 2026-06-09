@@ -902,7 +902,6 @@ class RAAS_PT_NewJob(RaasButtonsPanel, Panel):
 
         # Other settings
         job_info_col.prop(blender_job_info_new, 'job_project')
-        job_info_col.prop(blender_job_info_new, 'job_email')
         job_info_col.prop(blender_job_info_new, 'render_type')
         col = job_info_col.box()
         col = col.column(align=True)
@@ -1185,7 +1184,8 @@ async def SubmitJob(context, token):
         res = await raas_connection.ssh_command(server, cmd, preset)
         slurm_jobs = raas_jobs.slurm_extract_job_ids(res)
         if not slurm_jobs:
-            raise Exception("ssh command (CmdCreateJob) returned no Slurm job ids. Output: %s. Command: %s" % (res, cmd))
+            raise Exception(
+                "ssh command (CmdCreateJob) returned no Slurm job ids. Output: %s. Command: %s" % (res, cmd))
 
         cmd = raas_jobs.CmdCreateStatJobFile(context, res)
         if len(cmd) > 0:

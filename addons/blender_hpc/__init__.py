@@ -14,14 +14,14 @@
 # (c) IT4Innovations, VSB-TUO
 
 bl_info = {
-    "name" : "blender-hpc",
-    "author" : "Alexander Hallard",
-    "description" : "Rendering-as-a-service for Blender on HPC",
-    "blender" : (4, 0, 0),
-    "version" : (1, 0, 0),
-    "location" : "Addon Preferences panel",
-    "wiki_url" : "https://scebe-technicians.github.io/enucc-tutorials/software/blender/",
-    "category" : "System",
+    "name": "blender-hpc",
+    "author": "Alexander Hallard",
+    "description": "Rendering-as-a-service for Blender on HPC",
+    "blender": (4, 0, 0),
+    "version": (1, 0, 0),
+    "location": "Addon Preferences panel",
+    "wiki_url": "https://scebe-technicians.github.io/enucc-tutorials/software/blender/",
+    "category": "System",
 }
 
 import logging
@@ -53,6 +53,7 @@ def _setup_file_logging():
 
     return log_path
 
+
 def register():
     """Late-loads and registers the Blender-dependent submodules."""
 
@@ -69,7 +70,8 @@ def register():
 
     raas_setup.register()
     raas_pref.register()
-    raas_render.register()    
+    raas_render.register()
+
 
 def unregister():
     """unregister."""
@@ -78,10 +80,10 @@ def unregister():
     from . import raas_setup
     from . import raas_pref
     from . import raas_render
-    
+
     try:
         async_loop.unregister()
-        raas_render.unregister() 
+        raas_render.unregister()
         raas_pref.unregister()
         raas_setup.unregister()
     except RuntimeError:
